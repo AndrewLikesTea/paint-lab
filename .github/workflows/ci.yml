@@ -1,0 +1,38 @@
+name: CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # jsPaint has no build step — the app is static. Sanity-check the site
+      # shell exists and the entry scripts parse; the synthetic reviewer gate
+      # below is the substantive quality control.
+      - name: Site sanity
+        run: |
+          test -f index.html
+          node --version
+      - name: Require synthetic reviewer approval of current head
+        if: github.event_name == 'pull_request'
+        run: python3 .lab/check_reviewer_approval.py
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          APPROVAL_WAIT_SECONDS: "900"
+      - name: Enforce agent change policy
+        if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'agent/')
+        run: python3 .lab/policy.py --base "origin/${{ github.base_ref }}"

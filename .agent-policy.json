@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "branch_prefix": "agent/",
+  "max_files_changed": 30,
+  "max_diff_lines": 2000,
+  "max_agent_turns": 20,
+  "allowed_workspace_root": ".agent/worktrees",
+  "forbidden_paths": [
+    ".github/",
+    ".agent-policy.json",
+    ".lab/",
+    "LICENSE.txt",
+    "README-LAB.md"
+  ],
+  "forbidden_commands": [
+    "git push --force",
+    "git push origin main",
+    "gh pr merge",
+    "gh secret",
+    "wrangler pages deploy",
+    "rm -rf"
+  ],
+  "local_databases": {
+    "enabled": false,
+    "directory": ".agent/local-databases",
+    "name_prefix": "paint-lab-",
+    "max_name_length": 64,
+    "migration_directory": "migrations",
+    "allowed_operations": [],
+    "destructive_sql_allowed": false,
+    "symlinks_allowed": false
+  }
+}
