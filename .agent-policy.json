@@ -10,7 +10,9 @@
     ".agent-policy.json",
     ".lab/",
     "LICENSE.txt",
-    "README-LAB.md"
+    "README-LAB.md",
+    "PRODUCT.md",
+    "AGENTS.md"
   ],
   "forbidden_commands": [
     "git push --force",
