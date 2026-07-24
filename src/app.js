@@ -1452,6 +1452,39 @@ function canvas_pointer_move(e) {
 			}
 		}
 	}
+	// The browser delivers at most one pointermove per frame, but keeps the samples it
+	// merged into it. Tools that paint the whole segment from `pointer_previous` to
+	// `pointer` can replay those samples to follow the real path of a fast stroke,
+	// instead of chording straight across it and coming out polygonal.
+	// (The cause is that the pointer is sampled too coarsely, not devicePixelRatio: these
+	// are image-pixel coordinates, and the view layer is already device-pixel-aware.
+	// Scaling the document by devicePixelRatio would break the pixel-exactness this
+	// editor is built on.)
+	// Replay only when *every* selected tool opts in — several tools can be selected at
+	// once — so no tool gets `paint` calls it didn't ask for. The opted-in tools are the
+	// free-form ones, which never shift-snap above, so replaying raw samples is correct.
+	if (selected_tools.length > 0 && selected_tools.every((tool) => tool.paints_along_pointer_path)) {
+		const native_event = e.originalEvent;
+		const coalesced = native_event?.getCoalescedEvents ? native_event.getCoalescedEvents() : [];
+		// `paint` stamps the brush at both ends of every segment, so the blit count scales
+		// with the sample count. Cap it so an unusually large batch (e.g. samples piled up
+		// across a long stall) can't blow out a frame; real devices deliver single digits
+		// per frame even at 240Hz, so this never truncates in practice.
+		const max_samples = 32;
+		// The last coalesced event is this event's own position, which the existing code
+		// below already handles — replay only the intermediate samples.
+		const end = coalesced.length - 1;
+		const pointer_at_event = pointer;
+		for (let i = Math.max(0, end - max_samples); i < end; i++) {
+			pointer = to_canvas_coords(coalesced[i]);
+			selected_tools.forEach((selected_tool) => {
+				tool_go(selected_tool);
+			});
+			pointer_previous = pointer;
+		}
+		pointer = pointer_at_event;
+	}
+
 	selected_tools.forEach((selected_tool) => {
 		tool_go(selected_tool);
 	});

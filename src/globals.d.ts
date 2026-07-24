@@ -700,6 +700,14 @@ interface Tool {
 	stroke_only?: boolean,
 	/** Used by Airbrush tool */
 	paint_on_time_interval?: number,
+	/**
+	 * Indicates that the tool paints the whole segment from `pointer_previous` to `pointer`,
+	 * so it can be given the intermediate samples the browser coalesced into a pointermove
+	 * event, making fast strokes follow the real pointer path instead of chording across it.
+	 * Not implied by `get_brush`: Airbrush must be excluded, since its `paint_mask` sprays
+	 * randomly per call, so replaying samples would multiply the spray density.
+	 */
+	paints_along_pointer_path?: boolean,
 
 	/** Called when... */
 	preload?(): void,
