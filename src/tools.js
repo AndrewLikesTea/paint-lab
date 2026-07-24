@@ -383,6 +383,9 @@ const tools = [{
 	description: localize("Erases a portion of the picture, using the selected eraser shape."),
 	cursor: ["precise", [16, 16], "crosshair"],
 
+	// `paint` sweeps from pointer_previous to pointer, so intermediate samples improve it.
+	paints_along_pointer_path: true,
+
 	// binary mask of the drawn area, either opaque white or transparent
 	mask_canvas: null,
 
@@ -1474,6 +1477,10 @@ tools.forEach((tool) => {
 		};
 	}
 	if (tool.get_brush) {
+		// `paint` (below) sweeps a line from pointer_previous to pointer, so it can make
+		// use of the pointer samples between two pointermove events. (Brush and Pencil.)
+		tool.paints_along_pointer_path = true;
+
 		// binary mask of the drawn area, either opaque white or transparent
 		tool.mask_canvas = null;
 
