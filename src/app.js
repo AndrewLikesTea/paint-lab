@@ -11,7 +11,7 @@ import { default_palette, get_winter_palette } from "./color-data.js";
 import { show_edit_colors_window } from "./edit-colors.js";
 import { image_formats } from "./file-format-data.js";
 import { $this_version_news, cancel, change_some_url_params, change_url_param, clear, confirm_overwrite_capability, delete_selection, deselect, edit_copy, edit_cut, edit_paste, file_new, file_open, file_save, file_save_as, get_tool_by_id, get_uris, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, load_image_from_uri, make_or_update_undoable, open_from_file, paste, paste_image_from_file, redo, render_history_as_gif, reset_canvas_and_history, reset_file, reset_selected_colors, resize_canvas_and_save_dimensions, resize_canvas_without_saving_dimensions, save_as_prompt, select_all, select_tool, select_tools, set_magnification, show_document_history, show_error_message, show_news, show_resource_load_error_message, toggle_grid, undo, update_canvas_rect, update_disable_aa, update_helper_layer, update_magnified_canvas_size, view_bitmap, write_image_file } from "./functions.js";
-import { CanvasInteractionController } from "./canvas-rendering.js";
+import { CanvasInteractionController } from "./canvas-interaction.js";
 import { show_help } from "./help.js";
 import { $G, E, TAU, get_file_extension, get_help_folder_icon, is_discord_embed, make_canvas, to_canvas_coords } from "./helpers.js";
 import { init_webgl_stuff, rotate } from "./image-manipulation.js";
@@ -483,8 +483,13 @@ window.$canvas_area = $canvas_area;
 
 const $canvas = $(main_canvas).appendTo($canvas_area);
 window.$canvas = $canvas;
-const canvas_interactions = new CanvasInteractionController(main_canvas);
+// One finger on the canvas draws, so the canvas claims every touch on it.
+const canvas_interactions = new CanvasInteractionController(main_canvas, { policy: "draw" });
 canvas_interactions.start();
+// Two fingers anywhere in the canvas area pan and zoom the document (see "Panning and Zooming"),
+// so the area claims multi-touch only; one finger there still scrolls it natively as before.
+const canvas_area_interactions = new CanvasInteractionController($canvas_area[0], { policy: "gesture" });
+canvas_area_interactions.start();
 window.canvas_bounding_client_rect = main_canvas.getBoundingClientRect(); // cached for performance, updated later
 const canvas_handles = new Handles({
 	$handles_container: $canvas_area,
@@ -1443,6 +1448,26 @@ function update_fill_and_stroke_colors_and_lineWidth(selected_tool) {
 }
 
 // #region Primary Canvas Interaction
+
+/**
+ * The pointer that owns the drawing gesture in progress, or `undefined` between gestures.
+ * A gesture is a transaction: it opens on `pointerdown` on the canvas, and closes exactly
+ * once, either committed by `pointerup` or aborted by `pointercancel`.
+ * @type {number | undefined}
+ */
+let drawing_pointer_id;
+
+/**
+ * jQuery exposes `pointerId` on pointer events, but the synthetic events from Dwell Clicker,
+ * the head tracker and speech recognition may not have an `originalEvent` at all.
+ * @param {JQuery.Event} event
+ * @returns {number | undefined}
+ */
+function get_pointer_id(event) {
+	// @ts-ignore (pointerId is copied onto jQuery.Event by jQuery, but isn't in its types)
+	return event.pointerId ?? /** @type {PointerEvent | undefined} */(event.originalEvent)?.pointerId;
+}
+
 function tool_go(selected_tool, event_name) {
 	update_fill_and_stroke_colors_and_lineWidth(selected_tool);
 
@@ -1721,8 +1746,10 @@ $canvas.on("pointerdown", (e) => {
 	pointer_active = !!(e.buttons & (1 | 2)); // as far as tools are concerned
 	pointer_type = e.pointerType;
 	pointer_buttons = e.buttons;
+	drawing_pointer_id = get_pointer_id(e);
 	$G.one("pointerup", (e) => {
 		pointer_active = false;
+		drawing_pointer_id = undefined;
 		update_helper_layer(e);
 
 		if (!pointer_over_canvas && update_helper_layer_on_pointermove_active) {
@@ -1793,6 +1820,37 @@ $canvas.on("pointerdown", (e) => {
 	pointerdown_action();
 
 	update_helper_layer(e);
+});
+
+// The other half of the gesture transaction: the browser can take a pointer away instead of
+// releasing it (palm rejection, a system edge swipe, an OS gesture stealing the touch), and
+// then no `pointerup` ever arrives. Every drag in this app is torn down by a
+// `$G.one("pointerup")` handler bound at `pointerdown`, so a canceled touch used to leave the
+// gesture half-open: `canvas_pointer_move` stayed bound to the window (so moving a finger
+// without pressing kept painting), and any `paint_on_time_interval` timer kept running — the
+// Airbrush one is 5ms, and it sprayed until you started another stroke.
+//
+// Aborting rather than committing matches the existing two-finger path: `cancel(false, true)`
+// rolls the document back to `history_node_to_cancel_to` and discards the junk history node,
+// and its `$G.triggerHandler("pointerup", ["canceling", true])` runs the normal teardown with
+// `no_undoable` set, so the tools' `pointerup` handlers don't commit a stroke the user didn't
+// finish. A partial stroke isn't worth an undo step you have to press Ctrl+Z on.
+$G.on("pointercancel", (event) => {
+	// Only the drawing pointer's cancellation ends the drawing gesture. A finger resting on a
+	// toolbar getting canceled while you draw with a mouse is not your stroke ending, and a
+	// second finger on the canvas is already handled by the two-finger path above.
+	if (drawing_pointer_id === undefined || get_pointer_id(event) !== drawing_pointer_id) {
+		return;
+	}
+	if (history_node_to_cancel_to) {
+		cancel(false, true);
+	} else {
+		// Nothing to roll back (`cancel()` would return early without ending the gesture),
+		// but the gesture still has to be closed, since leaving it bound is the bug here.
+		$G.triggerHandler("pointerup", ["canceling", true]);
+	}
+	pointer_active = false; // NOTE: pointer_active used in cancel(); must be set after cancel()
+	drawing_pointer_id = undefined;
 });
 // #endregion
 
@@ -1885,6 +1943,17 @@ window.api_for_cypress_tests = {
 	selected_colors,
 	set_theme,
 	$,
+	/**
+	 * Snapshot of the input state, so specs can assert that a gesture ended (and that the
+	 * touch policy is doing its job) instead of only looking at pixels.
+	 */
+	get_interaction_state: () => ({
+		pointer_active,
+		drawing_pointer_id,
+		tracked_pointer_count: pointers.length,
+		canvas_touch_policy: canvas_interactions.get_state(),
+		canvas_area_touch_policy: canvas_area_interactions.get_state(),
+	}),
 };
 // #endregion
 
