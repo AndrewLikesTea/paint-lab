@@ -249,6 +249,7 @@ export default [
 			"src/app-state.js",
 			"src/copy-inkscape-labels.js",
 			"src/error-handling-basic.js",
+			"src/mobile-layout.js",
 			"svg-paint/svg-paint.js",
 			"localization/**/*.js",
 		],

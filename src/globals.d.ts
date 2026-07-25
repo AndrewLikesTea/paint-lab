@@ -117,6 +117,8 @@ declare interface I$ToolBox {
 // $ColorBox.js
 declare interface I$ColorBox {
 	rebuild_palette(): void;
+	/** Re-measure how many swatches fit across the palette, and resize it to hold the rest. */
+	update_palette_wrapping(): void;
 }
 
 // $Component.js
@@ -128,6 +130,14 @@ interface I$Component {
 	undock_to(x: number, y: number): void;
 	destroy(): void;
 }
+// mobile-layout.js
+/** Whether the primary pointer is a finger. */
+declare function is_touch_device(): boolean;
+/** Whether the space-constrained phone layout is in effect. */
+declare function is_phone_layout(): boolean;
+/** The size of a new document: the classic 683x384, or fitted to the screen on a phone. */
+declare function get_default_canvas_size(): { width: number, height: number };
+
 // helpers.js
 declare function make_css_cursor(name: string, coords: [number, number], fallback: string): string;
 declare function make_canvas(width: number, height: number): PixelCanvas;
@@ -279,6 +289,10 @@ declare function tool_go(tool: Tool, event_name?: string): void;
 // as well as globals from scripts that are not converted to ESM yet.
 // This supports `window.*` property access.
 interface Window {
+	// mobile-layout.js
+	is_touch_device: () => boolean;
+	is_phone_layout: () => boolean;
+	get_default_canvas_size: () => { width: number, height: number };
 	// helpers.js
 	$G: JQuery<Window>;
 	make_canvas: {

@@ -75,6 +75,9 @@
 	<meta name="twitter:creator" content="@isaiahodhner">
 
 	<script src="src/error-handling-basic.js"></script>
+	<!-- Sets .touch-device / .phone-layout on <html>. In the head, so the loading screen
+	below and the app it stands in for agree on the layout from the first paint. -->
+	<script src="src/mobile-layout.js"></script>
 	<script type="module" src="src/theme.js"></script>
 	<style>
 		#initial-loading {
@@ -108,6 +111,18 @@
 			height: min(420px, calc(100vh - 112px));
 			background: white;
 			border: 2px inset #fff;
+		}
+		/* Touch gets a wider toolbox and a smaller starting canvas (see src/mobile-layout.js);
+			keep the skeleton roughly the shape of what's about to replace it. */
+		.touch-device .initial-loading-workspace {
+			grid-template-columns: 88px minmax(0, 1fr);
+		}
+		.touch-device .initial-loading-tools {
+			background: repeating-linear-gradient(#c0c0c0 0 40px, #aaa 40px 44px);
+		}
+		.phone-layout .initial-loading-canvas {
+			width: min(683px, calc(100vw - 120px));
+			height: min(384px, calc(100vh - 210px));
 		}
 		.initial-loading-status {
 			margin: 3px;

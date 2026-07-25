@@ -16,8 +16,12 @@ const default_magnification = 1;
 /** @type {Tool} */
 const default_tool = window.get_tool_by_id(window.TOOL_PENCIL);
 
-const default_canvas_width = 683;
-const default_canvas_height = 384;
+// The classic 683x384, except in the phone layout, where a new document is sized to
+// fit the screen instead of opening scrolled away from most of itself.
+// (This is also what Image > Attributes' "Default" button restores, so the two agree.)
+const default_canvas_size = window.get_default_canvas_size();
+const default_canvas_width = default_canvas_size.width;
+const default_canvas_height = default_canvas_size.height;
 let my_canvas_width = default_canvas_width;
 let my_canvas_height = default_canvas_height;
 
