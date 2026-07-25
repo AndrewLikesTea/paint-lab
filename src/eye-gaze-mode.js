@@ -2,7 +2,8 @@
 // eslint-disable-next-line no-unused-vars
 /* global pointers:writable */
 /* global $Window, main_canvas, pointer_active, selected_tool, TrackyMouse */
-import { change_url_param, undo } from "./functions.js";
+import { loadOptionalScript } from "./optional-resources.js";
+import { change_url_param, show_error_message, undo } from "./functions.js";
 import { $G, load_image_simple } from "./helpers.js";
 import { TOOL_CURVE, TOOL_FILL, TOOL_MAGNIFIER, TOOL_PICK_COLOR, TOOL_POLYGON } from "./tools.js";
 
@@ -11,32 +12,36 @@ import { TOOL_CURVE, TOOL_FILL, TOOL_MAGNIFIER, TOOL_PICK_COLOR, TOOL_POLYGON } 
 
 
 let dwell_clicker = { paused: false, dispose: () => { } };
+const report_tracky_mouse_error = (feature, error) => {
+	change_url_param(feature, false);
+	show_error_message("The accessibility feature couldn't be loaded.", error);
+};
 
 let clean_up_dwell_clicker = () => { };
 $G.on("dwell-clicker-toggled", () => {
 	if ($("body").hasClass("dwell-clicker-mode")) {
-		init_dwell_clicker();
+		init_dwell_clicker().catch((error) => report_tracky_mouse_error("dwell-clicker", error));
 	} else {
 		clean_up_dwell_clicker();
 	}
 });
 if ($("body").hasClass("dwell-clicker-mode")) {
 	// #region Initialization (continued; marking stuff that ideally should be at the end of the file)
-	init_dwell_clicker();
+	init_dwell_clicker().catch((error) => report_tracky_mouse_error("dwell-clicker", error));
 	// #endregion
 }
 
 let clean_up_tracky_mouse_ui = () => { };
 $G.on("head-tracker-toggled", () => {
 	if ($("body").hasClass("head-tracker-mode")) {
-		init_tracky_mouse_ui();
+		init_tracky_mouse_ui().catch((error) => report_tracky_mouse_error("head-tracker", error));
 	} else {
 		clean_up_tracky_mouse_ui();
 	}
 });
 if ($("body").hasClass("head-tracker-mode")) {
 	// #region Initialization (continued; marking stuff that ideally should be at the end of the file)
-	init_tracky_mouse_ui();
+	init_tracky_mouse_ui().catch((error) => report_tracky_mouse_error("head-tracker", error));
 	// #endregion
 }
 
@@ -179,6 +184,7 @@ const dwell_clicker_config = {
 
 async function init_dwell_clicker() {
 	await new Promise((resolve) => $(resolve)); // wait for document ready so app UI is appended before Dwell Clicker visuals
+	await loadOptionalScript("lib/tracky-mouse/core/tracky-mouse.js", () => typeof TrackyMouse !== "undefined");
 
 	// (TODO: disable hovering to open submenus (other than with dwell clicking) while Dwell Clicker is enabled?)
 
@@ -198,6 +204,7 @@ var tracky_mouse_deps_promise;
 
 async function init_tracky_mouse_ui() {
 	await new Promise((resolve) => $(resolve)); // wait for document ready... maybe not needed here?
+	await loadOptionalScript("lib/tracky-mouse/core/tracky-mouse.js", () => typeof TrackyMouse !== "undefined");
 	// block for indentation to avoid confusing git diff
 	{
 		if (!tracky_mouse_deps_promise) {
@@ -542,4 +549,3 @@ const update_auto_scaling = () => {
 };
 $G.on("enlarge-ui-toggled", update_auto_scaling);
 update_auto_scaling();
-

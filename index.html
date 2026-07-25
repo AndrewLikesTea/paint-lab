@@ -75,9 +75,68 @@
 
 	<script src="src/error-handling-basic.js"></script>
 	<script type="module" src="src/theme.js"></script>
+	<style>
+		#initial-loading {
+			position: fixed;
+			inset: 0;
+			z-index: 10000;
+			display: grid;
+			grid-template-rows: 42px 1fr 28px;
+			background: #c0c0c0;
+			color: #000;
+			font: 12px Arial, sans-serif;
+		}
+		.initial-loading-bar {
+			margin: 3px;
+			background: #000080;
+			border: 2px outset #fff;
+		}
+		.initial-loading-workspace {
+			display: grid;
+			grid-template-columns: 58px minmax(0, 1fr);
+			gap: 8px;
+			padding: 8px;
+			background: #808080;
+		}
+		.initial-loading-tools {
+			background: repeating-linear-gradient(#c0c0c0 0 18px, #aaa 18px 20px);
+			border: 2px outset #fff;
+		}
+		.initial-loading-canvas {
+			width: min(640px, calc(100vw - 92px));
+			height: min(420px, calc(100vh - 112px));
+			background: white;
+			border: 2px inset #fff;
+		}
+		.initial-loading-status {
+			margin: 3px;
+			padding: 4px 7px;
+			border: 2px inset #fff;
+		}
+		#initial-loading[data-state="error"] .initial-loading-status {
+			color: #800000;
+			font-weight: bold;
+		}
+		@media (prefers-reduced-motion: no-preference) {
+			.initial-loading-canvas {
+				animation: initial-canvas-pulse 1.2s ease-in-out infinite alternate;
+			}
+			@keyframes initial-canvas-pulse {
+				to { background: #f4f4f4; }
+			}
+		}
+	</style>
 </head>
 
-<body>
+<body aria-busy="true">
+	<div id="initial-loading" role="status" aria-live="polite" aria-label="Loading JS Paint">
+		<div class="initial-loading-bar" aria-hidden="true"></div>
+		<div class="initial-loading-workspace" aria-hidden="true">
+			<div class="initial-loading-tools"></div>
+			<div class="initial-loading-canvas"></div>
+		</div>
+		<div class="initial-loading-status">Preparing a new canvas…</div>
+	</div>
 	<div id="about-paint" style="display: none">
 		<div id="about-paint-header">
 			<img src="images/icons/128x128.png" width="128" height="128" id="about-paint-icon" alt="" />
@@ -1406,22 +1465,18 @@
 
 	<!-- Note: no CDNs, even with fallback, as the fallback is too complicated to handle with CSP. -->
 	<script src="lib/jquery-3.4.1.min.js"></script>
-	<script src="lib/gif.js/gif.js"></script>
 	<!-- pako is used by UPNG.js and UTIF.js -->
 	<script src="lib/pako-2.0.3.min.js"></script>
 	<script src="lib/UPNG.js"></script>
 	<script src="lib/UTIF.js"></script>
 	<script src="lib/bmp.js"></script>
-	<script src="lib/pdf.js/build/pdf.js"></script>
 	<script src="lib/anypalette-0.6.0.js"></script>
 	<script src="lib/FileSaver.js"></script>
 	<script src="lib/font-detective.js"></script>
 	<script src="lib/libtess.min.js"></script>
-	<script src="lib/tracky-mouse/core/tracky-mouse.js"></script>
 	<script src="lib/os-gui/parse-theme.js"></script>
 	<script src="lib/os-gui/$Window.js"></script>
 	<script src="lib/os-gui/MenuBar.js"></script>
-	<script src="lib/imagetracer_v1.2.5.js"></script>
 
 	<!-- must not be async/deferred, as it uses document.write(); and must come before other app code which uses localization functions -->
 	<!-- (also depends on msgbox.js and thus os-gui.js, but not initially) -->
