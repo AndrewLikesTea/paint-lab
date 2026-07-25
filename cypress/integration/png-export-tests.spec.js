@@ -210,6 +210,55 @@ context("PNG export", () => {
 		cy.get("@download").its("firstCall.args.1").should("match", /\.png$/);
 	});
 
+	it("offers a one-tap, accessible native share action in the phone layout", () => {
+		cy.viewport(390, 844);
+		cy.visit("/#phone-layout", {
+			onBeforeLoad(win) {
+				win.sharedFiles = [];
+				Object.defineProperty(win.navigator, "canShare", {
+					value: () => true, configurable: true,
+				});
+				Object.defineProperty(win.navigator, "share", {
+					value: ({ files }) => {
+						win.sharedFiles.push(...files);
+						return Promise.resolve();
+					},
+					configurable: true,
+				});
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+
+		cy.get(".mobile-share-button")
+			.should("be.visible")
+			.and("have.attr", "aria-label", "Share drawing")
+			.and("have.attr", "aria-describedby", "mobile-share-status")
+			.should(($button) => {
+				const rect = $button[0].getBoundingClientRect();
+				expect(rect.width, "share target width").to.be.at.least(44);
+				expect(rect.height, "share target height").to.be.at.least(44);
+			})
+			.click();
+
+		cy.window().its("sharedFiles").should("have.length", 1);
+		cy.window().then((win) => {
+			const file = win.sharedFiles[0];
+			const canvas = win.document.querySelector(".main-canvas");
+			expect(file.type).to.equal("image/png");
+			expect(file.name).to.match(/\.png$/);
+			return cy.wrap(measureBlob(file).then(({ width, height }) => {
+				expect(width).to.equal(canvas.width);
+				expect(height).to.equal(canvas.height);
+			}));
+		});
+		cy.get("#mobile-share-status").should("have.text", "Shared");
+		cy.get(".mobile-share-button").should("not.be.disabled");
+	});
+
+	it("keeps the phone share action out of the classic desktop layout", () => {
+		cy.get(".mobile-share-button").should("not.be.visible");
+	});
+
 	it("labels the scale controls and supports keyboard navigation", () => {
 		clickMenuItem(".menu-button", "File");
 		clickMenuItem(".menu-item-label", "Export PNG");
