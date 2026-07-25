@@ -36,12 +36,15 @@ const param_types = {
 	"vertical-color-box-mode": "bool", // could rename this to simply "vertical-color-box" or "vertical-palette"
 	"speech-recognition-mode": "bool", // could rename this to simply "voice"
 	// dev settings
-	// (touch-device/phone-layout are normally detected; see src/mobile-layout.js.
+	// (touch-device/phone-layout/narrow-screen are normally detected; see src/mobile-layout.js.
 	// Forcing them on is how you check the touch layout without a touch device.
 	// They're listed here so they survive a URL rewrite, not to be toggled at runtime:
-	// the layout is read once as the UI is built, so changing them wants a reload.)
+	// the layout is read once as the UI is built, so changing them wants a reload.
+	// narrow-screen is the exception: the menu bar reshapes itself live, so that one can
+	// be added to the hash and taken away again without reloading.)
 	"touch-device": "bool",
 	"phone-layout": "bool",
+	"narrow-screen": "bool",
 	"compare-reference": "bool",
 	"compare-reference-tool-windows": "bool",
 	"force-open-project-news": "bool",

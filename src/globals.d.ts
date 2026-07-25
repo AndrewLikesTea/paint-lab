@@ -135,6 +135,8 @@ interface I$Component {
 declare function is_touch_device(): boolean;
 /** Whether the space-constrained phone layout is in effect. */
 declare function is_phone_layout(): boolean;
+/** Whether the viewport is too narrow for the menu bar to lay out across the top. */
+declare function is_narrow_screen(): boolean;
 /** The size of a new document: the classic 683x384, or fitted to the screen on a phone. */
 declare function get_default_canvas_size(): { width: number, height: number };
 
@@ -292,6 +294,7 @@ interface Window {
 	// mobile-layout.js
 	is_touch_device: () => boolean;
 	is_phone_layout: () => boolean;
+	is_narrow_screen: () => boolean;
 	get_default_canvas_size: () => { width: number, height: number };
 	// helpers.js
 	$G: JQuery<Window>;

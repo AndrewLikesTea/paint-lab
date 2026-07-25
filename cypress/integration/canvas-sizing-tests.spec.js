@@ -358,6 +358,10 @@ context("canvas sizing in the app", () => {
 		visit_as({ user_agent: IPHONE_USER_AGENT, max_touch_points: 5 });
 		cy.get(".main-canvas").then(($canvas) => {
 			const { width, height } = $canvas[0];
+			// A screen this narrow collapses the menu bar behind the hamburger button
+			// (see cypress/integration/menu-bar-responsive-tests.spec.js), so the File
+			// menu is one tap further in than it is on a desktop.
+			cy.get(".menu-bar-toggle").click();
 			clickMenuItem(".menu-button", "File");
 			clickMenuItem(".menu-item-label", "New");
 			cy.get(".main-canvas").should(($canvas_after) => {
