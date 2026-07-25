@@ -182,6 +182,30 @@ context("tool tests", () => {
 		});
 	});
 
+	it("opens the color picker with the unmodified C key", () => {
+		cy.window().then((win) => {
+			const input = win.document.createElement("input");
+			win.document.body.appendChild(input);
+			win.$(input).trigger(new win.$.Event("keydown", { key: "c" }));
+			expect(win.$(".edit-colors-window")).to.have.length(0);
+			input.remove();
+
+			const modifiedEvent = new win.$.Event("keydown", {
+				key: "c",
+				ctrlKey: true,
+			});
+			win.$("body").trigger(modifiedEvent);
+			expect(win.$(".edit-colors-window")).to.have.length(0);
+			expect(modifiedEvent.isDefaultPrevented()).to.equal(false);
+
+			const shortcutEvent = new win.$.Event("keydown", { key: "c" });
+			win.$("body").trigger(shortcutEvent);
+			expect(win.$(".edit-colors-window")).to.have.length(1);
+			expect(shortcutEvent.isDefaultPrevented()).to.equal(true);
+		});
+		cy.get(".edit-colors-window .window-close-button").click();
+	});
+
 	// it("brush tool", () => {
 	// 	cy.get(".tool[title='Brush']").click();
 	// 	// gesture([{ x: 50, y: 50 }, { x: 100, y: 100 }]);

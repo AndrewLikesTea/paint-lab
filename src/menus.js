@@ -708,6 +708,7 @@ const menus = {
 	[localize("&Colors")]: [
 		{
 			label: `${localize("&Edit Colors")}...`,
+			...shortcut("C"),
 			speech_recognition: [
 				"edit colors", "edit color", "edit custom colors", "edit custom color",
 				"pick custom color", "choose custom color", "pick a custom color", "choose a custom color",
