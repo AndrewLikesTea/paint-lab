@@ -15,10 +15,6 @@ import { simulateRandomGesturesPeriodically, simulatingGestures, stopSimulatingG
 import { speech_recognition_active, speech_recognition_available } from "./speech-recognition.js";
 import { get_theme, set_theme } from "./theme.js";
 
-const looksLikeChrome = !!(window.chrome && (window.chrome.loadTimes || window.chrome.csi));
-// NOTE: Microsoft Edge includes window.chrome.app
-// (also this browser detection logic could likely use some more nuance)
-
 /** @type {OSGUITopLevelMenus} */
 const menus = {
 	[localize("&File")]: [
@@ -671,12 +667,11 @@ const menus = {
 		},
 		{
 			label: localize("&Clear Image"),
-			...shortcut((window.is_electron_app || !looksLikeChrome) ? "Ctrl+Shift+N" : ""), // Ctrl+Shift+N opens incognito window in chrome
+			...shortcut("Ctrl+Shift+X"),
 			speech_recognition: [
 				"clear image", "clear canvas", "clear picture", "clear page", "clear drawing",
 				// @TODO: erase?
 			],
-			// (mspaint says "Ctrl+Shft+N")
 			action: () => { if (!selection) { clear(); } },
 			enabled: () => !selection,
 			description: localize("Clears the picture."),
