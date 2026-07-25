@@ -18,9 +18,19 @@
 //                  Screen space is scarce, so a new document is sized to fit rather
 //                  than starting the user off scrolled away from three of its corners.
 //
-// The styles live in the "Touch and phone layout" section of styles/layout.css.
-// Both classes can be forced on with the `touch-device` / `phone-layout` URL hash
-// params, to check the layout on a desktop (see `param_types` in src/functions.js).
+//   .narrow-screen A viewport too narrow to lay the menu bar out across the top. Below
+//                  this width the seven menus wrap onto a second row, spending a chunk
+//                  of a phone's screen on chrome, and each one is a text-height target.
+//                  So the menu bar collapses into a hamburger button that opens the
+//                  same menus in a vertical drawer -- see src/menu-bar-responsive.js.
+//                  Keyed on width alone, unlike the two above: a desktop window dragged
+//                  this narrow has exactly the problem a phone does, and the menu bar it
+//                  gets back when widened again is the one it always had.
+//
+// The styles live in the "Touch and phone layout" and "Responsive menu bar" sections of
+// styles/layout.css. All three classes can be forced on with the `touch-device` /
+// `phone-layout` / `narrow-screen` URL hash params, to check the layout on a desktop
+// (see `param_types` in src/functions.js).
 
 (function () {
 	"use strict";
@@ -29,6 +39,12 @@
 	var PHONE_LAYOUT_QUERY =
 		"(pointer: coarse) and (max-width: 700px), " +
 		"(pointer: coarse) and (max-height: 500px)";
+	// The mobile end of the three breakpoints the app is laid out around; the other two
+	// (tablet and desktop) are documented in the "Responsive menu bar" section of
+	// styles/layout.css, and only differ in how big the menu bar's targets are.
+	// 600px is below every phone held sideways and above every phone held upright,
+	// which is the line the menu bar actually needs: it fits across one and not the other.
+	var NARROW_SCREEN_QUERY = "(max-width: 600px)";
 
 	// Below this, in landscape, the toolbox goes from two tall columns to four short ones
 	// (must match the media query in styles/layout.css), and the palette settles for
@@ -57,6 +73,7 @@
 
 	var touch_device = false;
 	var phone_layout = false;
+	var narrow_screen = false;
 
 	function media_query_matches(query) {
 		return !!window.matchMedia && window.matchMedia(query).matches;
@@ -68,13 +85,27 @@
 	}
 
 	function update_classes() {
+		var was_narrow = narrow_screen;
+
 		phone_layout = forced_in_url("phone-layout") || media_query_matches(PHONE_LAYOUT_QUERY);
 		// A phone is a touch device; forcing the phone layout shouldn't leave you with
 		// mouse-sized tool buttons on it.
 		touch_device = phone_layout || forced_in_url("touch-device") || media_query_matches(TOUCH_DEVICE_QUERY);
+		narrow_screen = forced_in_url("narrow-screen") || media_query_matches(NARROW_SCREEN_QUERY);
 
 		document.documentElement.classList.toggle("touch-device", touch_device);
 		document.documentElement.classList.toggle("phone-layout", phone_layout);
+		document.documentElement.classList.toggle("narrow-screen", narrow_screen);
+
+		// Unlike the tool sizes and the default document size, which are settled once as
+		// the UI is built, the menu bar changes shape while the app is open -- a window
+		// dragged across the breakpoint has to grow its menu bar back. src/menu-bar-responsive.js
+		// listens for this rather than repeating the media query.
+		if (narrow_screen !== was_narrow) {
+			window.dispatchEvent(new CustomEvent("narrow-screen-change", {
+				detail: { narrowScreen: narrow_screen },
+			}));
+		}
 	}
 
 	/**
@@ -91,6 +122,14 @@
 	 */
 	function is_phone_layout() {
 		return phone_layout;
+	}
+
+	/**
+	 * Whether the viewport is too narrow for the menu bar to lay out across the top.
+	 * @returns {boolean}
+	 */
+	function is_narrow_screen() {
+		return narrow_screen;
 	}
 
 	/**
@@ -123,7 +162,7 @@
 	// Plugging in a mouse, rotating the phone, or resizing a desktop window with the
 	// layout forced on can all change the answer.
 	if (window.matchMedia) {
-		[TOUCH_DEVICE_QUERY, PHONE_LAYOUT_QUERY].forEach(function (query) {
+		[TOUCH_DEVICE_QUERY, PHONE_LAYOUT_QUERY, NARROW_SCREEN_QUERY].forEach(function (query) {
 			var media_query_list = window.matchMedia(query);
 			if (media_query_list.addEventListener) {
 				media_query_list.addEventListener("change", update_classes);
@@ -137,5 +176,6 @@
 
 	window.is_touch_device = is_touch_device;
 	window.is_phone_layout = is_phone_layout;
+	window.is_narrow_screen = is_narrow_screen;
 	window.get_default_canvas_size = get_default_canvas_size;
 })();

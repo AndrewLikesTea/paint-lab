@@ -16,6 +16,7 @@ import { CANVAS_SIZING_SCHEMA_VERSION, DESKTOP_CANVAS_HEIGHT, DESKTOP_CANVAS_WID
 import { show_help } from "./help.js";
 import { $G, E, TAU, get_file_extension, get_help_folder_icon, is_discord_embed, make_canvas, to_canvas_coords } from "./helpers.js";
 import { init_webgl_stuff, rotate } from "./image-manipulation.js";
+import { make_menu_bar_responsive } from "./menu-bar-responsive.js";
 import { menus } from "./menus.js";
 import { showMessageBox } from "./msgbox.js";
 import { stopSimulatingGestures } from "./simulate-random-gestures.js";
@@ -681,6 +682,11 @@ if (menu_bar_outside_frame) {
 	$(menu_bar.element).insertBefore(frameElement);
 } else {
 	$(menu_bar.element).prependTo($V);
+	// Collapse the menu bar into a hamburger drawer on screens too narrow for it.
+	// Only when the menu bar is ours: hosted in a frame it belongs to the page around us
+	// (98.js.org), which has its own layout and its own stylesheet, and neither the
+	// wrapper nor the drawer styles this adds would mean anything there.
+	make_menu_bar_responsive(menu_bar);
 }
 
 $(menu_bar.element).on("info", (event) => {
