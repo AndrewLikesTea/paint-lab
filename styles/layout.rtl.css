@@ -920,6 +920,99 @@ whereas it breaks component docking calculations if used to shift the colors box
 	margin-right: 15px;
 }
 
+/* Visually hidden, but still read by screen readers. Used for the live region
+that announces saving and deleting drawings in this browser. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
+
+.save-to-browser-window .save-to-browser-explanation,
+.save-to-browser-window .save-to-browser-message {
+	margin: 5px;
+	max-width: 300px;
+	white-space: normal; /* overriding .window:not(.squish) */
+}
+.save-to-browser-window .save-to-browser-message {
+	min-height: 1.2em; /* reserve space, so the dialog doesn't jump when a message appears */
+}
+.save-to-browser-window .save-to-browser-field {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	margin: 5px;
+	width: 300px;
+	max-width: calc(100vw - 60px);
+}
+.save-to-browser-window .save-to-browser-field input {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.open-from-browser-window .saved-drawings-list {
+	list-style: none;
+	margin: 5px;
+	padding: 0;
+	width: 380px;
+	max-width: calc(100vw - 60px);
+	max-height: 50vh;
+	overflow-y: auto;
+}
+.open-from-browser-window .saved-drawing {
+	display: flex;
+	flex-wrap: wrap; /* the buttons wrap below the name when there's not enough room */
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+}
+.open-from-browser-window .saved-drawing-thumbnail-container {
+	flex: 0 0 auto;
+	width: 48px;
+	height: 48px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.open-from-browser-window .saved-drawing-thumbnail {
+	max-width: 48px;
+	max-height: 48px;
+	flex: 0 0 auto;
+}
+.open-from-browser-window .saved-drawing-text {
+	flex: 1 1 120px;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+.open-from-browser-window .saved-drawing-name {
+	overflow-wrap: break-word;
+}
+.open-from-browser-window .saved-drawing-details {
+	opacity: 0.8;
+	font-size: 0.9em;
+}
+/* A row whose drawing has been deleted, until it's restored or the window is closed. */
+.open-from-browser-window .saved-drawing.deleted .saved-drawing-thumbnail-container,
+.open-from-browser-window .saved-drawing.deleted .saved-drawing-text {
+	opacity: 0.6;
+}
+.open-from-browser-window .saved-drawing-buttons {
+	flex: 0 0 auto;
+	display: flex;
+	gap: 4px;
+}
+.open-from-browser-window .saved-drawings-message {
+	margin: 5px;
+	max-width: 380px;
+}
+
 .history-window .window-content {
 	direction: rtl;
 }

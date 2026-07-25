@@ -50,7 +50,7 @@ function manage_storage() {
 	// @TODO: way to remove all (with confirmation)
 	const $table = $(E("table")).appendTo($storage_manager.$main);
 	const $message = $(E("p")).appendTo($storage_manager.$main).html(
-		"Any images you've saved to your computer with <b>File > Save</b> will not be affected."
+		"This lists automatic backups. Images you've saved with <b>File > Save</b> or <b>File > Save to Browser</b> will not be affected."
 	);
 	const $close = $storage_manager.$Button("Close", () => {
 		$storage_manager.close();
