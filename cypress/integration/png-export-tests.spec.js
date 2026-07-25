@@ -160,11 +160,19 @@ context("PNG export", () => {
 		});
 	});
 
-	it("omits the Share button when the platform can't share files", () => {
+	it("falls back to the clipboard when file sharing is unavailable", () => {
 		cy.visit("/", {
 			onBeforeLoad(win) {
 				Object.defineProperty(win.navigator, "canShare", {
 					value: () => false, configurable: true,
+				});
+				win.sharedClipboardItems = [];
+				win.ClipboardItem = class ClipboardItem {
+					constructor(dict) { win.sharedClipboardItems.push(dict); }
+				};
+				Object.defineProperty(win.navigator, "clipboard", {
+					value: { write: () => Promise.resolve() },
+					configurable: true,
 				});
 			},
 		});
@@ -172,8 +180,34 @@ context("PNG export", () => {
 
 		clickMenuItem(".menu-button", "File");
 		clickMenuItem(".menu-item-label", "Export PNG");
-		cy.contains("button", /^Export$/).should("exist");
-		cy.contains("button", /^Share$/).should("not.exist");
+		cy.contains("button", /^Share$/).click();
+		cy.window().its("sharedClipboardItems").should("have.length", 1);
+	});
+
+	it("falls back to a download when sharing and clipboard access fail", () => {
+		cy.visit("/", {
+			onBeforeLoad(win) {
+				Object.defineProperty(win.navigator, "canShare", {
+					value: () => false, configurable: true,
+				});
+				win.ClipboardItem = class ClipboardItem {};
+				Object.defineProperty(win.navigator, "clipboard", {
+					value: { write: () => Promise.reject(new Error("denied")) },
+					configurable: true,
+				});
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+		cy.window().then((win) => {
+			cy.stub(win, "saveAs").as("download");
+		});
+
+		clickMenuItem(".menu-button", "File");
+		clickMenuItem(".menu-item-label", "Export PNG");
+		cy.contains("button", /^Share$/).click();
+		cy.get("@download").should("have.been.calledOnce");
+		cy.get("@download").its("firstCall.args.0.type").should("equal", "image/png");
+		cy.get("@download").its("firstCall.args.1").should("match", /\.png$/);
 	});
 
 	it("labels the scale controls and supports keyboard navigation", () => {
