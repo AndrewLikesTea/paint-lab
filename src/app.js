@@ -1133,6 +1133,13 @@ $G.on("keydown", (e) => {
 			case "E":
 				image_attributes();
 				break;
+			case "X":
+				if (e.shiftKey) {
+					clear();
+				} else {
+					return; // Allow the browser's native cut command.
+				}
+				break;
 
 			// These shortcuts are mostly reserved by browsers,
 			// but they are allowed in Electron.

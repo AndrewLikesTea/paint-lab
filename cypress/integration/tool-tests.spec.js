@@ -127,6 +127,32 @@ context("tool tests", () => {
 	// 	trigger("pointerup", points[i].x, points[i].y, options);
 	// };
 
+	it("clears the canvas with Ctrl+Shift+X and can undo the clear", () => {
+		cy.window().then({ timeout: 60000 }, async (win) => {
+			const canvas = win.$(".main-canvas")[0];
+			const blankCanvas = canvas.toDataURL();
+			await simulateGesture(win, {
+				start: { x: 0.2, y: 0.2 },
+				end: { x: 0.4, y: 0.4 },
+			});
+			const drawnCanvas = canvas.toDataURL();
+			expect(drawnCanvas).not.to.equal(blankCanvas);
+
+			win.$("body").trigger(new win.$.Event("keydown", {
+				key: "x",
+				ctrlKey: true,
+				shiftKey: true,
+			}));
+			expect(canvas.toDataURL()).to.equal(blankCanvas);
+
+			win.$("body").trigger(new win.$.Event("keydown", {
+				key: "z",
+				ctrlKey: true,
+			}));
+			expect(canvas.toDataURL()).to.equal(drawnCanvas);
+		});
+	});
+
 	// it("brush tool", () => {
 	// 	cy.get(".tool[title='Brush']").click();
 	// 	// gesture([{ x: 50, y: 50 }, { x: 100, y: 100 }]);
