@@ -87,7 +87,14 @@ window.systemHookDefaults = {
 			// OR, show two dialogs, one for the format and then one for the save location.
 			const { newFileFormatID } = await save_as_prompt({ dialogTitle, defaultFileName, defaultFileFormatID, formats, promptForName: false });
 			const new_format = formats.find((format) => format.formatID === newFileFormatID);
-			const blob = await getBlob(new_format && new_format.formatID);
+			let blob;
+			try {
+				blob = await getBlob(new_format && new_format.formatID);
+			} catch (_error) {
+				// The encoder reports the actionable error. Stop this save attempt
+				// without turning it into an unhandled promise rejection.
+				return;
+			}
 			formats = [new_format];
 			let newHandle;
 			let newFileName;
@@ -192,7 +199,13 @@ window.systemHookDefaults = {
 		} else {
 
 			const { newFileName, newFileFormatID } = await save_as_prompt({ dialogTitle, defaultFileName, defaultFileFormatID, formats });
-			const blob = await getBlob(newFileFormatID);
+			let blob;
+			try {
+				blob = await getBlob(newFileFormatID);
+			} catch (_error) {
+				// See the equivalent File System Access API path above.
+				return;
+			}
 			saveAs(blob, newFileName);
 			savedCallbackUnreliable?.({
 				newFileName,
@@ -295,10 +308,10 @@ window.systemHookDefaults = {
 			defaultFileFormatID: "image/png",
 			formats: image_formats,
 			getBlob: (new_file_type) => {
-				return new Promise((resolve) => {
+				return new Promise((resolve, reject) => {
 					write_image_file(canvas, new_file_type, (blob) => {
 						resolve(blob);
-					});
+					}, reject);
 				});
 			},
 		});

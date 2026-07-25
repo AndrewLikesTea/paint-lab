@@ -15,7 +15,7 @@ import { $G, E, TAU, debounce, from_canvas_coords, get_help_folder_icon, get_ico
 import { apply_image_transformation, draw_grid, draw_selection_box, flip_horizontal, flip_vertical, invert_monochrome, invert_rgb, rotate, stretch_and_skew, threshold_black_and_white } from "./image-manipulation.js";
 import { show_imgur_uploader } from "./imgur.js";
 import { showMessageBox } from "./msgbox.js";
-import { loadOptionalScript } from "./optional-resources.js";
+import { loadOptionalScript, load_bmp_codec, load_palette_library, load_tiff_codec } from "./optional-resources.js";
 import { localStore } from "./storage.js";
 import { TOOL_CURVE, TOOL_FREE_FORM_SELECT, TOOL_POLYGON, TOOL_SELECT, TOOL_TEXT, tools } from "./tools.js";
 // `sessions.js` must be loaded after `app.js`
@@ -1026,8 +1026,16 @@ function open_from_file(file, source_file_handle) {
 		return;
 	}
 	// Try loading as an image file first, then as a palette file, but show a combined error message if both fail.
-	read_image_file(file, (as_image_error, image_info) => {
+	read_image_file(file, async (as_image_error, image_info) => {
 		if (as_image_error) {
+			try {
+				await load_palette_library();
+			} catch (_load_error) {
+				// The file wasn't a readable image, and we can't check whether it's a palette,
+				// so report the image error rather than a confusing library error.
+				show_file_format_errors({ as_image_error });
+				return;
+			}
 			AnyPalette.loadPalette(file, (as_palette_error, new_palette) => {
 				if (as_palette_error) {
 					show_file_format_errors({ as_image_error, as_palette_error });
@@ -1228,10 +1236,10 @@ function file_save_as(maybe_saved_callback = () => { }, update_from_saved = true
 		defaultPath: typeof system_file_handle === "string" ? system_file_handle : null,
 		defaultFileFormatID: file_format,
 		getBlob: (new_file_type) => {
-			return new Promise((resolve) => {
+			return new Promise((resolve, reject) => {
 				write_image_file(main_canvas, new_file_type, (blob) => {
 					resolve(blob);
-				});
+				}, reject);
 			});
 		},
 		savedCallbackUnreliable: ({ newFileName, newFileFormatID, newFileHandle, newBlob }) => {
@@ -1300,8 +1308,8 @@ function show_export_png_dialog() {
 			defaultFileName: `${name_without_extension}${scale === 1 ? "" : `@${scale}x`}.png`,
 			defaultFileFormatID: "image/png",
 			formats: png_format,
-			getBlob: () => new Promise((resolve) => {
-				write_image_file(export_canvas, "image/png", resolve);
+			getBlob: () => new Promise((resolve, reject) => {
+				write_image_file(export_canvas, "image/png", resolve, reject);
 			}),
 		});
 	}, { type: "submit" });
@@ -3917,44 +3925,64 @@ function save_as_prompt({
  * @param {HTMLCanvasElement} canvas - The canvas to export as an image file. Must have a 2d context.
  * @param {string} mime_type - The MIME type of the image file.
  * @param {(Blob)=> void} blob_callback - This function is called with the blob, or may never be called if there is an error.
+ * @param {(error: unknown)=> void} [error_callback] - Called when an optional encoder cannot be loaded.
  */
-function write_image_file(canvas, mime_type, blob_callback) {
+async function write_image_file(canvas, mime_type, blob_callback, error_callback = () => { }) {
 	const ctx = canvas.getContext("2d");
 	const bmp_match = mime_type.match(/^image\/(?:x-)?bmp\s*(?:-(\d+)bpp)?/);
-	if (bmp_match) {
-		const file_content = encodeBMP(ctx.getImageData(0, 0, canvas.width, canvas.height), parseInt(bmp_match[1] || "24", 10));
-		const blob = new Blob([file_content]);
-		sanity_check_blob(blob, () => {
-			blob_callback(blob);
-		});
-	} else if (mime_type === "image/png") {
-		// UPNG.js gives better compressed PNGs than the built-in browser PNG encoder
-		// In fact you can use it as a minifier! http://upng.photopea.com/
-		const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-		const array_buffer = UPNG.encode([image_data.data.buffer], image_data.width, image_data.height);
-		const blob = new Blob([array_buffer]);
-		sanity_check_blob(blob, () => {
-			blob_callback(blob);
-		});
-	} else if (mime_type === "image/tiff") {
-		const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-		const metadata = {
-			t305: ["jspaint (UTIF.js)"],
-		};
-		const array_buffer = UTIF.encodeImage(image_data.data.buffer, image_data.width, image_data.height, metadata);
-		const blob = new Blob([array_buffer]);
-		sanity_check_blob(blob, () => {
-			blob_callback(blob);
-		});
-	} else {
-		canvas.toBlob((blob) => {
-			// Note: could check blob.type (mime type) instead
-			const png_magic_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+	// The encoders are loaded on demand, so everything from here on is async,
+	// and a failure has to be reported rather than thrown into a dropped promise.
+	try {
+		if (bmp_match) {
+			await load_bmp_codec();
+			const file_content = encodeBMP(ctx.getImageData(0, 0, canvas.width, canvas.height), parseInt(bmp_match[1] || "24", 10));
+			const blob = new Blob([file_content]);
 			sanity_check_blob(blob, () => {
 				blob_callback(blob);
-			}, png_magic_bytes, mime_type === "image/png");
-		}, mime_type);
+			});
+		} else if (mime_type === "image/png") {
+			// UPNG.js gives better compressed PNGs than the built-in browser PNG encoder
+			// In fact you can use it as a minifier! http://upng.photopea.com/
+			const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+			const array_buffer = UPNG.encode([image_data.data.buffer], image_data.width, image_data.height);
+			const blob = new Blob([array_buffer]);
+			sanity_check_blob(blob, () => {
+				blob_callback(blob);
+			});
+		} else if (mime_type === "image/tiff") {
+			await load_tiff_codec();
+			const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+			const metadata = {
+				t305: ["jspaint (UTIF.js)"],
+			};
+			const array_buffer = UTIF.encodeImage(image_data.data.buffer, image_data.width, image_data.height, metadata);
+			const blob = new Blob([array_buffer]);
+			sanity_check_blob(blob, () => {
+				blob_callback(blob);
+			});
+		} else {
+			write_image_file_with_browser_encoder(canvas, mime_type, blob_callback);
+		}
+	} catch (error) {
+		show_error_message(localize("Failed to save document."), error);
+		error_callback(error);
 	}
+}
+
+/**
+ * Fallback for formats the browser can encode itself (JPEG, WebP, GIF...).
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} mime_type
+ * @param {(Blob)=> void} blob_callback
+ */
+function write_image_file_with_browser_encoder(canvas, mime_type, blob_callback) {
+	canvas.toBlob((blob) => {
+		// Note: could check blob.type (mime type) instead
+		const png_magic_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+		sanity_check_blob(blob, () => {
+			blob_callback(blob);
+		}, png_magic_bytes, mime_type === "image/png");
+	}, mime_type);
 }
 
 /**
@@ -3999,6 +4027,12 @@ function read_image_file(blob, callback) {
 			}
 		}
 		if (detected_type_id === "bmp") {
+			try {
+				await load_bmp_codec();
+			} catch (error) {
+				callback(error);
+				return;
+			}
 			const { colorTable, bitsPerPixel, imageData } = decodeBMP(arrayBuffer);
 			file_format = bitsPerPixel === 24 ? "image/bmp" : `image/bmp;bpp=${bitsPerPixel}`;
 			if (colorTable.length >= 2) {
@@ -4049,6 +4083,12 @@ function read_image_file(blob, callback) {
 			const image_data = new ImageData(new Uint8ClampedArray(rgba), width, height);
 			callback(null, { file_format, monochrome, palette, image_data, source_blob: blob });
 		} else if (detected_type_id === "tiff_be" || detected_type_id === "tiff_le") {
+			try {
+				await load_tiff_codec();
+			} catch (error) {
+				callback(error);
+				return;
+			}
 			// IFDs = image file directories
 			// VSNs = ???
 			// This code is based on UTIF.bufferToURI
@@ -4200,10 +4240,10 @@ function save_selection_to_file() {
 			defaultFileFormatID: "image/png",
 			formats: image_formats,
 			getBlob: (new_file_type) => {
-				return new Promise((resolve) => {
+				return new Promise((resolve, reject) => {
 					write_image_file(selection.canvas, new_file_type, (blob) => {
 						resolve(blob);
-					});
+					}, reject);
 				});
 			},
 		});

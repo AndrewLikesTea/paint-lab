@@ -2,7 +2,7 @@
 // eslint-disable-next-line no-unused-vars
 /* global pointers:writable */
 /* global $Window, main_canvas, pointer_active, selected_tool, TrackyMouse */
-import { loadOptionalScript } from "./optional-resources.js";
+import { loadOptionalScript, loadOptionalStylesheet } from "./optional-resources.js";
 import { change_url_param, show_error_message, undo } from "./functions.js";
 import { $G, load_image_simple } from "./helpers.js";
 import { TOOL_CURVE, TOOL_FILL, TOOL_MAGNIFIER, TOOL_PICK_COLOR, TOOL_POLYGON } from "./tools.js";
@@ -16,6 +16,16 @@ const report_tracky_mouse_error = (feature, error) => {
 	change_url_param(feature, false);
 	show_error_message("The accessibility feature couldn't be loaded.", error);
 };
+
+/**
+ * Tracky Mouse's script and styles, which are only needed once one of these
+ * opt-in modes is turned on. The stylesheet has to be in place before the UI
+ * it styles is shown, so both are loaded together.
+ */
+const load_tracky_mouse = () => Promise.all([
+	loadOptionalScript("lib/tracky-mouse/core/tracky-mouse.js", () => typeof TrackyMouse !== "undefined"),
+	loadOptionalStylesheet("lib/tracky-mouse/core/tracky-mouse.css"),
+]);
 
 let clean_up_dwell_clicker = () => { };
 $G.on("dwell-clicker-toggled", () => {
@@ -184,7 +194,7 @@ const dwell_clicker_config = {
 
 async function init_dwell_clicker() {
 	await new Promise((resolve) => $(resolve)); // wait for document ready so app UI is appended before Dwell Clicker visuals
-	await loadOptionalScript("lib/tracky-mouse/core/tracky-mouse.js", () => typeof TrackyMouse !== "undefined");
+	await load_tracky_mouse();
 
 	// (TODO: disable hovering to open submenus (other than with dwell clicking) while Dwell Clicker is enabled?)
 
@@ -204,7 +214,7 @@ var tracky_mouse_deps_promise;
 
 async function init_tracky_mouse_ui() {
 	await new Promise((resolve) => $(resolve)); // wait for document ready... maybe not needed here?
-	await loadOptionalScript("lib/tracky-mouse/core/tracky-mouse.js", () => typeof TrackyMouse !== "undefined");
+	await load_tracky_mouse();
 	// block for indentation to avoid confusing git diff
 	{
 		if (!tracky_mouse_deps_promise) {

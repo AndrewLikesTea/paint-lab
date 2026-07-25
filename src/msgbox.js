@@ -21,17 +21,36 @@ try {
 	// It's very silly. Also, on subsequent plays, it only plays part of the sound.
 	// And Web Audio API is better for playing SFX anyway because it can play a sound overlapping with itself.
 	const audioContext = window.audioContext = window.audioContext || new AudioContext();
-	const audio_buffer_promise =
-		fetch(CHORD_WAV_URL)
-			.then((response) => response.arrayBuffer())
-			.then((array_buffer) => audioContext.decodeAudioData(array_buffer));
+	let audio_buffer_promise = null;
+	const load_chord = () => {
+		if (!audio_buffer_promise) {
+			audio_buffer_promise = fetch(CHORD_WAV_URL)
+				.then((response) => response.arrayBuffer())
+				.then((array_buffer) => audioContext.decodeAudioData(array_buffer));
+		}
+		return audio_buffer_promise;
+	};
+	// The sound is the single largest asset in the app, and it isn't needed until
+	// something goes wrong, so it waits for the UI to be up before spending
+	// bandwidth on it. (It's still fetched ahead of time, so the first message
+	// box isn't silent.) The timer is a fallback in case the app never signals
+	// ready — better a late sound than none.
+	const preload_chord = () => {
+		if (typeof requestIdleCallback === "function") {
+			requestIdleCallback(() => load_chord().catch(() => { }), { timeout: 10000 });
+		} else {
+			load_chord().catch(() => { });
+		}
+	};
+	window.addEventListener("jspaint-ready", preload_chord, { once: true });
+	setTimeout(preload_chord, 10000);
 	var play_chord = async function () {
 		audioContext.resume(); // in case it was not allowed to start until a user interaction
 		// Note that this should be before waiting for the audio buffer,
 		// so that it works the first time.
 		// (This only works if the message box is opened during a user gesture.)
 
-		const audio_buffer = await audio_buffer_promise;
+		const audio_buffer = await load_chord();
 		const source = audioContext.createBufferSource();
 		source.buffer = audio_buffer;
 		source.connect(audioContext.destination);

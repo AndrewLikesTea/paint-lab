@@ -12,6 +12,7 @@
 declare const libtess: any;
 declare const firebase: any;
 declare const GIF: any;
+declare const pako: any; // dependency of UPNG.js and UTIF.js
 declare const UTIF: any;
 declare const UPNG: any;
 declare const encodeBMP: any;
