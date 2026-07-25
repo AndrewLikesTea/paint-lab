@@ -33,7 +33,10 @@ context("PNG export", () => {
 
 			clickMenuItem(".menu-button", "File");
 			clickMenuItem(".menu-item-label", "Export PNG");
-			cy.get(`#export-png-scale-${scale}`).should("be.visible").check().should("be.checked");
+			// The radio input itself is visually hidden; 98.css draws the control on the label,
+			// which is what a user clicks.
+			cy.contains("label", new RegExp(`^${scale}x `)).click();
+			cy.get(`#export-png-scale-${scale}`).should("be.checked");
 			cy.contains("button", /^Export$/).click();
 			cy.get("@saveDialog").should("have.been.calledOnce");
 			cy.window().then((win) => cy.wrap(win.pngExportPromise));
@@ -45,12 +48,21 @@ context("PNG export", () => {
 		clickMenuItem(".menu-item-label", "Export PNG");
 
 		cy.get("fieldset legend").should("have.text", "Scale");
-		cy.get("#export-png-scale-1").should("be.focused");
-		cy.get("#export-png-scale-1").type("{rightarrow}");
-		cy.get("#export-png-scale-2").should("be.checked");
-		cy.get("#export-png-scale-2").type("{rightarrow}");
-		cy.get("#export-png-scale-4").should("be.checked");
-		cy.get("#export-png-scale-4").type("{esc}");
+		// Each option's visible label is tied to its input, so clicking or reading it works.
+		for (const scale of [1, 2, 4]) {
+			cy.contains("label", new RegExp(`^${scale}x `))
+				.should("have.attr", "for", `export-png-scale-${scale}`);
+		}
+		cy.get("#export-png-scale-1").should("be.focused").should("be.checked");
+
+		// The shortcuts the options advertise with aria-keyshortcuts.
+		// (force: the inputs are focusable but visually hidden, as noted above.)
+		cy.get("#export-png-scale-1").type("2", { force: true });
+		cy.get("#export-png-scale-2").should("be.checked").should("be.focused");
+		cy.get("#export-png-scale-2").type("{alt}4", { force: true });
+		cy.get("#export-png-scale-4").should("be.checked").should("be.focused");
+
+		cy.get("#export-png-scale-4").type("{esc}", { force: true });
 		cy.contains(".window-title", "Export PNG").should("not.exist");
 	});
 });

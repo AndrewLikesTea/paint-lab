@@ -1315,6 +1315,9 @@ function show_export_png_dialog() {
 	});
 	$w.center();
 	$w.$main.find("input[name='export-png-scale']").first().focus();
+
+	// Makes the aria-keyshortcuts above actually work, as in the other dialogs with them.
+	handle_keyshortcuts($w);
 }
 
 function file_print() {

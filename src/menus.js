@@ -11,6 +11,7 @@ import { $G, get_rgba_from_color, is_discord_embed } from "./helpers.js";
 import { show_imgur_uploader } from "./imgur.js";
 import { manage_storage } from "./manage-storage.js";
 import { showMessageBox } from "./msgbox.js";
+import { show_open_from_browser_dialog, show_save_to_browser_dialog } from "./saved-drawings.js";
 import { simulateRandomGesturesPeriodically, simulatingGestures, stopSimulatingGestures } from "./simulate-random-gestures.js";
 import { speech_recognition_active, speech_recognition_available } from "./speech-recognition.js";
 import { get_theme, set_theme } from "./theme.js";
@@ -118,6 +119,27 @@ const menus = {
 			],
 			action: () => { show_export_png_dialog(); },
 			description: localize("Exports the active document as a PNG at a chosen scale."),
+		},
+		MENU_DIVIDER,
+		{
+			label: localize("Save to &Browser"),
+			speech_recognition: [
+				"save to browser", "save in browser", "save to the browser", "save in the browser",
+				"save document to browser", "save image to browser", "save picture to browser", "save drawing to browser",
+				"save to browser storage", "save to local storage", "save to this device", "save locally",
+			],
+			action: () => { show_save_to_browser_dialog(); },
+			description: localize("Saves the active document in this browser."),
+		},
+		{
+			label: localize("Open &from Browser"),
+			speech_recognition: [
+				"open from browser", "open from the browser", "load from browser", "load from the browser",
+				"open document from browser", "open image from browser", "open picture from browser", "open drawing from browser",
+				"open from browser storage", "open from local storage", "open saved drawings", "show saved drawings", "saved drawings",
+			],
+			action: () => { show_open_from_browser_dialog(); },
+			description: localize("Opens a document saved in this browser."),
 		},
 		MENU_DIVIDER,
 		{
