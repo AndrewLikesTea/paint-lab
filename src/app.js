@@ -906,6 +906,10 @@ $("body").on("dragover dragenter", (/** @type {JQuery.DragOverEvent | JQuery.Dra
 // #endregion
 
 // #region Keyboard Shortcuts
+const KEYBOARD_ZOOM_STEP = 0.25;
+const MIN_KEYBOARD_MAGNIFICATION = 0.5;
+const MAX_KEYBOARD_MAGNIFICATION = 80;
+
 $G.on("keydown", (e) => {
 	// typecast to HTMLElement because e.target is incorrectly given as Window, due to $G wrapping window
 	const target = /** @type {HTMLElement} */ (/** @type {unknown} */ (e.target));
@@ -1011,16 +1015,26 @@ $G.on("keydown", (e) => {
 			e.preventDefault();
 		}
 	} else if (
+		e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+		(e.key === "/" || e.key === "-")
+	) {
+		const direction = e.key === "/" ? 1 : -1;
+		const new_magnification = Math.max(
+			MIN_KEYBOARD_MAGNIFICATION,
+			Math.min(magnification + direction * KEYBOARD_ZOOM_STEP, MAX_KEYBOARD_MAGNIFICATION)
+		);
+		set_magnification(new_magnification);
+		e.preventDefault();
+		return;
+	} else if (
 		e.code === "NumpadAdd" ||
 		e.code === "NumpadSubtract" ||
 		// normal + and - keys
 		e.key === "+" ||
 		e.key === "-" ||
-		e.key === "=" ||
-		// Ctrl+/ is an explicit size-increase shortcut.
-		(e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === "/")
+		e.key === "="
 	) {
-		const plus = e.code === "NumpadAdd" || e.key === "+" || e.key === "=" || e.key === "/";
+		const plus = e.code === "NumpadAdd" || e.key === "+" || e.key === "=";
 		const minus = e.code === "NumpadSubtract" || e.key === "-";
 		const delta = Number(plus) - Number(minus); // const delta = +plus++ -minus--; // Δ = ±±±±
 

@@ -153,32 +153,34 @@ context("tool tests", () => {
 		});
 	});
 
-	it("adjusts brush size with Ctrl+/ and Ctrl/- and updates the options UI", () => {
-		cy.get(".tool[title='Brush']").click();
+	it("zooms the canvas with Ctrl+/ and Ctrl/- within the supported limits", () => {
 		cy.window().then((win) => {
-			const $brushOptions = win.$(".choose-brush .chooser-option");
-			const $selectedOption = $brushOptions.filter((_, option) =>
-				win.$(option).css("background-color") !== "rgba(0, 0, 0, 0)"
-			);
-			expect($selectedOption).to.have.length(1);
+			const canvas = win.$(".main-canvas")[0];
+			const initialWidth = canvas.getBoundingClientRect().width;
+			const triggerZoom = (key) => {
+				const event = new win.$.Event("keydown", {
+					key,
+					ctrlKey: true,
+				});
+				win.$("body").trigger(event);
+				expect(event.isDefaultPrevented()).to.equal(true);
+			};
 
-			const increaseEvent = new win.$.Event("keydown", {
-				key: "/",
-				ctrlKey: true,
-			});
-			win.$("body").trigger(increaseEvent);
-			expect(increaseEvent.isDefaultPrevented()).to.equal(true);
-			expect($brushOptions.filter((_, option) =>
-				win.$(option).css("background-color") !== "rgba(0, 0, 0, 0)"
-			)).to.have.length(0);
+			triggerZoom("/");
+			expect(canvas.getBoundingClientRect().width).to.equal(initialWidth * 1.25);
 
-			const decreaseEvent = new win.$.Event("keydown", {
-				key: "-",
-				ctrlKey: true,
-			});
-			win.$("body").trigger(decreaseEvent);
-			expect(decreaseEvent.isDefaultPrevented()).to.equal(true);
-			expect($selectedOption.css("background-color")).not.to.equal("rgba(0, 0, 0, 0)");
+			triggerZoom("-");
+			expect(canvas.getBoundingClientRect().width).to.equal(initialWidth);
+
+			for (let index = 0; index < 4; index++) {
+				triggerZoom("-");
+			}
+			expect(canvas.getBoundingClientRect().width).to.equal(initialWidth * 0.5);
+
+			for (let index = 0; index < 321; index++) {
+				triggerZoom("/");
+			}
+			expect(canvas.getBoundingClientRect().width).to.equal(initialWidth * 80);
 		});
 	});
 
