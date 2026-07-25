@@ -1065,6 +1065,18 @@ $G.on("keydown", (e) => {
 		show_edit_colors_window();
 		e.preventDefault();
 		return;
+	} else if (
+		!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
+		!target.closest(".window, [contenteditable=true]")
+	) {
+		const shortcut_tool = tools.find((tool) =>
+			tool.keyboard_shortcut?.toUpperCase() === e.key.toUpperCase()
+		);
+		if (shortcut_tool) {
+			select_tool(shortcut_tool);
+			e.preventDefault();
+			return;
+		}
 	} else if (e.ctrlKey || e.metaKey) {
 		if (textbox) {
 			switch (e.key.toUpperCase()) {
