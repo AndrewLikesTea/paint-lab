@@ -795,7 +795,7 @@ class RESTSession {
 			log("Write canvas data to server");
 			this._previous_uri = uri;
 			this._last_write_time = performance.now(); // not sure about this
-			await fetch(`/api/rooms/${this.id}/data`, {
+			await fetch(`api/rooms/${this.id}/data`, {
 				method: "PUT",
 				body: uri,
 			});
@@ -819,7 +819,7 @@ class RESTSession {
 			let received_image_data_uri;
 			try {
 				this._poll_fetch_start_time = performance.now();
-				const response = await fetch(`/api/rooms/${this.id}/data`);
+				const response = await fetch(`api/rooms/${this.id}/data`);
 				if (response.status === 404) {
 					// If the image data wasn't found, this is a new session
 					received_image_data_uri = null;
@@ -1057,4 +1057,3 @@ if (is_discord_embed) {
 export { new_local_session };
 // Temporary globals until all dependent code is converted to ES Modules
 window.new_local_session = new_local_session; // used by functions.js
-

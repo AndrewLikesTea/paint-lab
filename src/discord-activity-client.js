@@ -37,7 +37,7 @@ const { code } = await discordSdk.commands.authorize({
 });
 
 // Retrieve an access_token from your embedded app's server
-const response = await fetch("/api/token", {
+const response = await fetch("api/token", {
 	method: "POST",
 	headers: {
 		"Content-Type": "application/json",
@@ -56,7 +56,7 @@ const newAuth = await discordSdk.commands.authenticate({
 // Get guild specific nickname and avatar, and fallback to user name and avatar?
 /** @type {IGuildsMembersRead | null} */
 const guildMember = await fetch(
-	`/discord/api/users/@me/guilds/${discordSdk.guildId}/member`,
+	`discord/api/users/@me/guilds/${discordSdk.guildId}/member`,
 	{
 		method: "get",
 		headers: { Authorization: `Bearer ${access_token}` },
