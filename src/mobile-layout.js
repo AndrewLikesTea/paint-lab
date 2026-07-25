@@ -30,8 +30,9 @@
 		"(pointer: coarse) and (max-width: 700px), " +
 		"(pointer: coarse) and (max-height: 500px)";
 
-	// Below this the palette drops from three rows to two, and (in landscape) the toolbox
-	// goes from two tall columns to four short ones. Must match styles/layout.css.
+	// Below this, in landscape, the toolbox goes from two tall columns to four short ones
+	// (must match the media query in styles/layout.css), and the palette settles for
+	// smaller swatches -- that part being src/$ColorBox.js's call, from the room it finds.
 	var SHORT_VIEWPORT_MAX_HEIGHT = 650;
 
 	// The classic MS Paint default, and what anything with a mouse keeps getting.
@@ -42,10 +43,14 @@
 	// and the menu bar, colors box and status bar stacked with it. Approximate on purpose --
 	// this only picks a *default* document size, and the canvas area scrolls regardless;
 	// it just shouldn't open already scrolled.
+	// The palette's own height varies with the screen (src/$ColorBox.js picks the swatch
+	// size and line count to fit it); these cover the two cases a phone lands in: a tall
+	// screen affords finger-sized swatches four lines deep, a short one settles for
+	// smaller ones two or three lines deep.
 	var TWO_COLUMN_TOOLBOX_WIDTH = 104;
 	var FOUR_COLUMN_TOOLBOX_WIDTH = 190;
-	var THREE_ROW_PALETTE_CHROME_HEIGHT = 200;
-	var TWO_ROW_PALETTE_CHROME_HEIGHT = 125;
+	var TALL_SCREEN_CHROME_HEIGHT = 225;
+	var SHORT_SCREEN_CHROME_HEIGHT = 145;
 
 	// Below this a "fitted" canvas is too small to draw on; let it scroll instead.
 	var MIN_FITTED_CANVAS_SIZE = 64;
@@ -102,7 +107,7 @@
 		var shallow = window.innerHeight <= SHORT_VIEWPORT_MAX_HEIGHT;
 		var landscape = window.innerWidth > window.innerHeight;
 		var chrome_width = shallow && landscape ? FOUR_COLUMN_TOOLBOX_WIDTH : TWO_COLUMN_TOOLBOX_WIDTH;
-		var chrome_height = shallow ? TWO_ROW_PALETTE_CHROME_HEIGHT : THREE_ROW_PALETTE_CHROME_HEIGHT;
+		var chrome_height = shallow ? SHORT_SCREEN_CHROME_HEIGHT : TALL_SCREEN_CHROME_HEIGHT;
 		return {
 			width: fit(window.innerWidth - chrome_width, CLASSIC_CANVAS_WIDTH),
 			height: fit(window.innerHeight - chrome_height, CLASSIC_CANVAS_HEIGHT),
