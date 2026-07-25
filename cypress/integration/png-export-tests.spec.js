@@ -43,6 +43,139 @@ context("PNG export", () => {
 		});
 	}
 
+	// Reads a blob's real dimensions by decoding it, so these assert what an
+	// image viewer would see, not just what the export claimed.
+	const measureBlob = async (blob) => {
+		const image = new Image();
+		const url = URL.createObjectURL(blob);
+		image.src = url;
+		try {
+			await image.decode();
+			return { width: image.naturalWidth, height: image.naturalHeight };
+		} finally {
+			URL.revokeObjectURL(url);
+		}
+	};
+
+	// The Clipboard API is permission-gated, and the real ClipboardItem doesn't
+	// expose what it was constructed with, so both are replaced with recorders.
+	// `write` resolves or rejects depending on what the test is checking.
+	const stubClipboard = (win, { fail = false } = {}) => {
+		const recorded = [];
+		win.ClipboardItem = class ClipboardItem {
+			constructor(dict) { recorded.push(dict); }
+		};
+		Object.defineProperty(win.navigator, "clipboard", {
+			value: {
+				write: () => (fail ?
+					Promise.reject(new Error("clipboard write denied")) :
+					Promise.resolve()),
+			},
+			configurable: true,
+		});
+		return recorded;
+	};
+
+	it("copies the exported image to the clipboard at the chosen scale", () => {
+		cy.window().then((win) => {
+			const recorded = stubClipboard(win);
+
+			clickMenuItem(".menu-button", "File");
+			clickMenuItem(".menu-item-label", "Export PNG");
+			cy.contains("label", /^2x /).click();
+			cy.contains("button", /^Copy$/).click();
+
+			// The handler is async, so wait for the ClipboardItem to be built.
+			cy.wrap(null).should(() => expect(recorded).to.have.lengthOf(1));
+			cy.then(() => {
+				const canvas = win.document.querySelector(".canvas-area > canvas");
+				// Keyed by MIME type, which the export pipeline guarantees even
+				// though the PNG encoder produces an untyped blob.
+				expect(Object.keys(recorded[0])).to.deep.equal(["image/png"]);
+				const blob = recorded[0]["image/png"];
+				expect(blob.type).to.equal("image/png");
+				return cy.wrap(measureBlob(blob).then(({ width, height }) => {
+					expect(width).to.equal(canvas.width * 2);
+					expect(height).to.equal(canvas.height * 2);
+				}));
+			});
+		});
+	});
+
+	it("reports a clipboard failure instead of failing silently", () => {
+		cy.window().then((win) => stubClipboard(win, { fail: true }));
+
+		clickMenuItem(".menu-button", "File");
+		clickMenuItem(".menu-item-label", "Export PNG");
+		cy.contains("button", /^Copy$/).click();
+
+		// show_error_message renders the text into a plain div with no class of
+		// its own, so match on the text rather than a selector.
+		cy.contains("Failed to copy to the Clipboard.").should("exist");
+	});
+
+	it("shares a typed PNG file, and treats a dismissed share sheet as a non-error", () => {
+		// Share is only offered when the platform can share files, which the test
+		// browser generally can't, so both capabilities are stubbed before load.
+		cy.visit("/", {
+			onBeforeLoad(win) {
+				win.sharedFiles = [];
+				Object.defineProperty(win.navigator, "canShare", {
+					value: () => true, configurable: true,
+				});
+				Object.defineProperty(win.navigator, "share", {
+					value: (data) => {
+						win.sharedFiles.push(data.files[0]);
+						// Simulate the user dismissing the share sheet, which must
+						// not surface as an error.
+						const abort = new Error("dismissed");
+						abort.name = "AbortError";
+						return Promise.reject(abort);
+					},
+					configurable: true,
+				});
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+
+		clickMenuItem(".menu-button", "File");
+		clickMenuItem(".menu-item-label", "Export PNG");
+		cy.contains("label", /^4x /).click();
+		cy.contains("button", /^Share$/).click();
+
+		cy.window().then((win) => {
+			cy.wrap(null).should(() => expect(win.sharedFiles).to.have.lengthOf(1));
+			cy.then(() => {
+				const canvas = win.document.querySelector(".canvas-area > canvas");
+				const file = win.sharedFiles[0];
+				expect(file.type).to.equal("image/png");
+				expect(file.name).to.match(/@4x\.png$/);
+				return cy.wrap(measureBlob(file).then(({ width, height }) => {
+					expect(width).to.equal(canvas.width * 4);
+					expect(height).to.equal(canvas.height * 4);
+				}));
+			});
+			// AbortError must not produce an error dialog.
+			cy.contains("Failed to share the image.").should("not.exist");
+		});
+	});
+
+	it("omits the Share button when the platform can't share files", () => {
+		cy.visit("/", {
+			onBeforeLoad(win) {
+				Object.defineProperty(win.navigator, "canShare", {
+					value: () => false, configurable: true,
+				});
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+
+		clickMenuItem(".menu-button", "File");
+		clickMenuItem(".menu-item-label", "Export PNG");
+		cy.contains("button", /^Export$/).should("exist");
+		cy.contains("button", /^Share$/).should("not.exist");
+	});
+
 	it("labels the scale controls and supports keyboard navigation", () => {
 		clickMenuItem(".menu-button", "File");
 		clickMenuItem(".menu-item-label", "Export PNG");
