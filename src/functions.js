@@ -635,12 +635,22 @@ function toggle_thumbnail() {
 					height = Math.round(entry.contentRect.height * devicePixelRatio);
 				}
 				if (width && height) { // If it's hidden, and then shown, it gets a width and height of 0 briefly on iOS. (This would give IndexSizeError in drawImage.)
-					thumbnail_canvas.width = width;
-					thumbnail_canvas.height = height;
-					// Setting width/height resets image smoothing (along with everything).
-					// The thumbnail scales the document up on high-DPI screens, so this has to
-					// stay nearest-neighbor to match the main canvas view.
-					thumbnail_canvas.ctx.disable_image_smoothing();
+					const sizing = calculate_canvas_sizing({
+						// The observer has already resolved CSS layout and device-pixel
+						// alignment. Recover the logical size so the shared sizing contract
+						// applies those exact backing dimensions transactionally.
+						logicalWidth: width / window.devicePixelRatio,
+						logicalHeight: height / window.devicePixelRatio,
+					}, {
+						pixelRatio: window.devicePixelRatio,
+						magnification: 1,
+					});
+					if (apply_canvas_sizing(thumbnail_canvas, sizing)) {
+						// Setting width/height resets image smoothing (along with everything).
+						// The thumbnail scales the document up on high-DPI screens, so this has
+						// to stay nearest-neighbor to match the main canvas view.
+						thumbnail_canvas.ctx.disable_image_smoothing();
+					}
 				}
 				update_helper_layer_immediately(); // updates thumbnail (but also unnecessarily the helper layer)
 			}).observe(thumbnail_canvas, { box: "device-pixel-content-box" });
