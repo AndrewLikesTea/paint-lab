@@ -12,6 +12,7 @@ import { apply_canvas_sizing, calculate_canvas_sizing, calculate_view_source_siz
 import { default_palette } from "./color-data.js";
 import { image_formats } from "./file-format-data.js";
 import { $G, E, TAU, debounce, from_canvas_coords, get_help_folder_icon, get_icon_for_tool, get_rgba_from_color, is_discord_embed, is_pride_month, make_canvas, render_access_key, to_canvas_coords } from "./helpers.js";
+import { EXPORT_SCALES, can_share_image_files, export_dimensions, export_image_blob, make_export_config, report_export_error } from "./image-export.js";
 import { apply_image_transformation, draw_grid, draw_selection_box, flip_horizontal, flip_vertical, invert_monochrome, invert_rgb, rotate, stretch_and_skew, threshold_black_and_white } from "./image-manipulation.js";
 import { show_imgur_uploader } from "./imgur.js";
 import { showMessageBox } from "./msgbox.js";
@@ -1288,6 +1289,8 @@ function file_save_as(maybe_saved_callback = () => { }, update_from_saved = true
 	});
 }
 
+/** @typedef {import("./image-export.js").ExportConfig} ExportConfig */
+
 /** @type {OSGUI$Window} */
 let $export_png_window;
 function show_export_png_dialog() {
@@ -1297,54 +1300,126 @@ function show_export_png_dialog() {
 	const $w = $DialogWindow(localize("Export PNG"));
 	$export_png_window = $w;
 	$w.addClass("horizontal-buttons");
+	// The scale options and the sizes they advertise come from EXPORT_SCALES and
+	// the same arithmetic that does the scaling, so the labels can't drift from
+	// what you actually get.
+	const scale_fields = EXPORT_SCALES.map((scale) => {
+		const { width, height } = export_dimensions(main_canvas, make_export_config({ scale }));
+		return `
+				<div class="radio-field">
+					<input type="radio" name="export-png-scale" id="export-png-scale-${scale}" value="${scale}"${scale === 1 ? " checked" : ""} aria-keyshortcuts="Alt+${scale} ${scale}">
+					<label for="export-png-scale-${scale}">${render_access_key(`&${scale}x`)} (${width} × ${height})</label>
+				</div>`;
+	}).join("");
 	$w.$main.append(`
 		<p>${localize("Choose the size of the exported image.")}</p>
 		<fieldset>
 			<legend>${localize("Scale")}</legend>
-			<div class="fieldset-body">
-				<div class="radio-field">
-					<input type="radio" name="export-png-scale" id="export-png-scale-1" value="1" checked aria-keyshortcuts="Alt+1 1">
-					<label for="export-png-scale-1">${render_access_key("&1x")} (${main_canvas.width} × ${main_canvas.height})</label>
-				</div>
-				<div class="radio-field">
-					<input type="radio" name="export-png-scale" id="export-png-scale-2" value="2" aria-keyshortcuts="Alt+2 2">
-					<label for="export-png-scale-2">${render_access_key("&2x")} (${main_canvas.width * 2} × ${main_canvas.height * 2})</label>
-				</div>
-				<div class="radio-field">
-					<input type="radio" name="export-png-scale" id="export-png-scale-4" value="4" aria-keyshortcuts="Alt+4 4">
-					<label for="export-png-scale-4">${render_access_key("&4x")} (${main_canvas.width * 4} × ${main_canvas.height * 4})</label>
-				</div>
+			<div class="fieldset-body">${scale_fields}
 			</div>
 		</fieldset>
 	`);
 
-	$w.$Button(localize("Export"), () => {
+	/**
+	 * The chosen scale, as a validated config.
+	 *
+	 * The radio group always has one option checked, so this should never fall
+	 * back; it does so anyway rather than letting a markup change turn into a
+	 * `make_canvas(NaN, NaN)` further down.
+	 * @returns {ExportConfig}
+	 */
+	const read_export_config = () => {
 		const scale = Number($w.$main.find("input[name='export-png-scale']:checked").val());
+		if (!EXPORT_SCALES.includes(scale)) {
+			window.console?.warn(`No valid export scale selected (got ${JSON.stringify(scale)}); falling back to 1x.`);
+			return make_export_config({ scale: 1 });
+		}
+		return make_export_config({ scale });
+	};
+
+	/**
+	 * @param {ExportConfig} config
+	 * @returns {string} File name matching Save's convention, e.g. "untitled@2x.png".
+	 */
+	const export_file_name = (config) => {
+		const name_without_extension = file_name.replace(/\.[^.]*$/, "");
+		return `${name_without_extension}${config.scale === 1 ? "" : `@${config.scale}x`}.png`;
+	};
+
+	/**
+	 * Shared preamble: capture the chosen scale, dismiss the dialog, and fold any
+	 * floating selection into the document so it's included in the export, the
+	 * same way Save does.
+	 * @returns {ExportConfig}
+	 */
+	const begin_export = () => {
+		const config = read_export_config();
 		$w.close();
 		deselect();
+		return config;
+	};
 
-		let export_canvas;
-		try {
-			export_canvas = make_canvas(main_canvas.width * scale, main_canvas.height * scale);
-			export_canvas.ctx.imageSmoothingEnabled = false;
-			export_canvas.ctx.drawImage(main_canvas, 0, 0, export_canvas.width, export_canvas.height);
-		} catch (error) {
-			show_error_message(localize("Failed to save document."), error);
-			return;
-		}
-
-		const png_format = image_formats.filter(({ mimeType }) => mimeType === "image/png");
-		const name_without_extension = file_name.replace(/\.[^.]*$/, "");
+	$w.$Button(localize("Export"), () => {
+		const config = begin_export();
+		const png_format = image_formats.filter(({ mimeType }) => mimeType === config.mime_type);
 		systemHooks.showSaveFileDialog({
 			dialogTitle: localize("Export PNG"),
-			defaultFileName: `${name_without_extension}${scale === 1 ? "" : `@${scale}x`}.png`,
-			defaultFileFormatID: "image/png",
+			defaultFileName: export_file_name(config),
+			defaultFileFormatID: config.mime_type,
 			formats: png_format,
-			getBlob: () => new Promise((resolve, reject) => {
-				write_image_file(export_canvas, "image/png", resolve, reject);
-			}),
+			// Rendered lazily, inside getBlob: at 4x the scaled canvas holds 16x
+			// the document's pixels, and the save dialog can sit open
+			// indefinitely, so building it up front would hold all that memory
+			// for the duration and waste it entirely if the user cancels.
+			getBlob: () => export_image_blob(main_canvas, config, write_image_file),
 		});
 	}, { type: "submit" });
+
+	$w.$Button(localize("Copy"), async () => {
+		const config = begin_export();
+		// Checked before encoding, so an unsupported browser doesn't pay for a
+		// 4x render just to be told it can't have the result.
+		if (!navigator.clipboard?.write || typeof ClipboardItem !== "function") {
+			show_error_message(`${localize("Error getting the Clipboard Data!")} ${recommendationForClipboardAccess}`);
+			return;
+		}
+		try {
+			const blob = await export_image_blob(main_canvas, config, write_image_file);
+			await navigator.clipboard.write([
+				// Same shape as edit_copy's ClipboardItem: a computed key that
+				// stays an own enumerable property. Keyed by the configured type
+				// rather than blob.type, which the export pipeline guarantees.
+				new ClipboardItem(Object.defineProperty({}, config.mime_type, {
+					value: blob,
+					enumerable: true,
+				})),
+			]);
+			window.console?.log(`Copied image to the clipboard at ${config.scale}x.`);
+		} catch (error) {
+			report_export_error(error, localize("Failed to copy to the Clipboard."), show_error_message);
+		}
+	});
+
+	// Only offered when the platform can actually share files. Most desktop
+	// browsers can't, and a Share button that always errors is worse than none.
+	if (can_share_image_files()) {
+		$w.$Button(localize("Share"), async () => {
+			const config = begin_export();
+			try {
+				const blob = await export_image_blob(main_canvas, config, write_image_file);
+				await navigator.share({
+					files: [new File([blob], export_file_name(config), { type: config.mime_type })],
+				});
+			} catch (error) {
+				// Dismissing the share sheet is a choice, not a failure.
+				if (/** @type {Error} */ (error)?.name === "AbortError") {
+					return;
+				}
+				report_export_error(error, localize("Failed to share the image."), show_error_message);
+			}
+		});
+	}
+
 	$w.$Button(localize("Cancel"), () => {
 		$w.close();
 	});
