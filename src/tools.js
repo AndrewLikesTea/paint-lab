@@ -374,6 +374,7 @@ const tools = [{
 }, {
 	id: TOOL_ERASER,
 	name: localize("Eraser/Color Eraser"),
+	keyboard_shortcut: "E",
 	speech_recognition: [
 		"erase", "eraser", "rubber", "wiper", "clearer", "mark remover", "obliterator", "expunger",
 		"color eraser", "color replacer", "replace color", "replace colors",

@@ -686,6 +686,8 @@ type ToolID =
 interface Tool {
 	id: ToolID,
 	name: string,
+	/** Unmodified keyboard key that activates the tool. */
+	keyboard_shortcut?: string,
 	speech_recognition: string[],
 	help_icon: string,
 	description: string,

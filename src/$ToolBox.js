@@ -30,6 +30,9 @@ function $ToolBox(tools, is_extras) {
 		tool.$button = $b;
 
 		$b.attr("title", tool.name);
+		if (tool.keyboard_shortcut) {
+			$b.attr("aria-keyshortcuts", tool.keyboard_shortcut);
+		}
 
 		const $icon = $(E("span")).addClass("tool-icon");
 		$icon.appendTo($b);

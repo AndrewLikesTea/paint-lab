@@ -206,6 +206,41 @@ context("tool tests", () => {
 		cy.get(".edit-colors-window .window-close-button").click();
 	});
 
+	it("activates the eraser with the unmodified E key", () => {
+		cy.get(".tool[title='Brush']").click();
+		cy.window().then((win) => {
+			const $brush = win.$(".tool[title='Brush']");
+			const $eraser = win.$(".tool[title='Eraser/Color Eraser']");
+			expect($eraser.attr("aria-keyshortcuts")).to.equal("E");
+
+			const input = win.document.createElement("input");
+			win.document.body.appendChild(input);
+			win.$(input).trigger(new win.$.Event("keydown", { key: "e" }));
+			expect($brush).to.have.class("selected");
+			input.remove();
+
+			[
+				{ ctrlKey: true },
+				{ metaKey: true },
+			].forEach((modifier) => {
+				win.$("body").trigger(new win.$.Event("keydown", {
+					key: "e",
+					...modifier,
+				}));
+				expect($brush).to.have.class("selected");
+				expect($eraser).not.to.have.class("selected");
+				expect(win.$(".attributes-window")).to.have.length(1);
+			});
+
+			const shortcutEvent = new win.$.Event("keydown", { key: "e" });
+			win.$("body").trigger(shortcutEvent);
+			expect($brush).not.to.have.class("selected");
+			expect($eraser).to.have.class("selected");
+			expect(shortcutEvent.isDefaultPrevented()).to.equal(true);
+		});
+		cy.get(".attributes-window .window-close-button").click();
+	});
+
 	// it("brush tool", () => {
 	// 	cy.get(".tool[title='Brush']").click();
 	// 	// gesture([{ x: 50, y: 50 }, { x: 100, y: 100 }]);
