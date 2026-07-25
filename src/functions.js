@@ -7,6 +7,7 @@ import { $DialogWindow } from "./$ToolWindow.js";
 import { OnCanvasHelperLayer } from "./OnCanvasHelperLayer.js";
 import { OnCanvasSelection } from "./OnCanvasSelection.js";
 import { OnCanvasTextBox } from "./OnCanvasTextBox.js";
+import { apply_canvas_sizing, calculate_canvas_sizing } from "./canvas-rendering.js";
 // import { localize } from "./app-localization.js";
 import { default_palette } from "./color-data.js";
 import { image_formats } from "./file-format-data.js";
@@ -196,12 +197,6 @@ function update_helper_layer_immediately() {
 		pointer = to_canvas_coords(info_for_updating_pointer);
 	}
 
-	const scale = magnification * window.devicePixelRatio;
-
-	if (!helper_layer) {
-		helper_layer = new OnCanvasHelperLayer(0, 0, main_canvas.width, main_canvas.height, false, scale);
-	}
-
 	const margin = 15;
 	const viewport_x = Math.floor(Math.max($canvas_area.scrollLeft() / magnification - margin, 0));
 	// Nevermind, canvas, isn't aligned to the right in RTL layout!
@@ -215,14 +210,19 @@ function update_helper_layer_immediately() {
 	const viewport_y2 = Math.floor(Math.min(viewport_y + $canvas_area.height() / magnification + margin * 2, main_canvas.height));
 	const viewport_width = viewport_x2 - viewport_x;
 	const viewport_height = viewport_y2 - viewport_y;
-	const resolution_width = viewport_width * scale;
-	const resolution_height = viewport_height * scale;
-	if (
-		helper_layer.canvas.width !== resolution_width ||
-		helper_layer.canvas.height !== resolution_height
-	) {
-		helper_layer.canvas.width = resolution_width;
-		helper_layer.canvas.height = resolution_height;
+	const sizing = calculate_canvas_sizing({
+		logicalWidth: viewport_width,
+		logicalHeight: viewport_height,
+	}, {
+		pixelRatio: window.devicePixelRatio,
+		magnification,
+	});
+
+	if (!helper_layer) {
+		helper_layer = new OnCanvasHelperLayer(0, 0, viewport_width, viewport_height, false);
+	}
+
+	if (apply_canvas_sizing(helper_layer.canvas, sizing)) {
 		helper_layer.canvas.ctx.disable_image_smoothing();
 		helper_layer.width = viewport_width;
 		helper_layer.height = viewport_height;
@@ -231,7 +231,7 @@ function update_helper_layer_immediately() {
 	helper_layer.y = viewport_y;
 	helper_layer.position();
 
-	render_canvas_view(helper_layer.canvas, scale, viewport_x, viewport_y, true);
+	render_canvas_view(helper_layer.canvas, sizing.renderScale, viewport_x, viewport_y, true);
 
 	if (thumbnail_canvas && $thumbnail_window.is(":visible")) {
 		// The thumbnail can be bigger or smaller than the viewport, depending on the magnification and thumbnail window size.
