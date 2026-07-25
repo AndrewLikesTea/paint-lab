@@ -7,7 +7,7 @@ import { $DialogWindow } from "./$ToolWindow.js";
 import { OnCanvasHelperLayer } from "./OnCanvasHelperLayer.js";
 import { OnCanvasSelection } from "./OnCanvasSelection.js";
 import { OnCanvasTextBox } from "./OnCanvasTextBox.js";
-import { apply_canvas_sizing, calculate_canvas_sizing } from "./canvas-rendering.js";
+import { apply_canvas_sizing, calculate_canvas_sizing, calculate_view_source_size } from "./canvas-rendering.js";
 // import { localize } from "./app-localization.js";
 import { default_palette } from "./color-data.js";
 import { image_formats } from "./file-format-data.js";
@@ -271,10 +271,16 @@ function update_helper_layer_immediately() {
 		scroll_x_fraction = Math.min(scroll_x_fraction, 1);
 		scroll_y_fraction = Math.min(scroll_y_fraction, 1);
 
-		let viewport_x = Math.floor(Math.max(scroll_x_fraction * (main_canvas.width - thumbnail_canvas.width), 0));
-		let viewport_y = Math.floor(Math.max(scroll_y_fraction * (main_canvas.height - thumbnail_canvas.height), 0));
+		// The backing store is sized in device pixels (see the ResizeObserver in
+		// `toggle_thumbnail`), so the document has to be drawn at `devicePixelRatio` for the
+		// thumbnail to cover the same part of the drawing, at the same apparent size, on
+		// every display density — and to be sharp rather than merely small.
+		const thumbnail_view = calculate_view_source_size(thumbnail_canvas, window.devicePixelRatio);
 
-		render_canvas_view(thumbnail_canvas, 1, viewport_x, viewport_y, false); // devicePixelRatio?
+		let viewport_x = Math.floor(Math.max(scroll_x_fraction * (main_canvas.width - thumbnail_view.sourceWidth), 0));
+		let viewport_y = Math.floor(Math.max(scroll_y_fraction * (main_canvas.height - thumbnail_view.sourceHeight), 0));
+
+		render_canvas_view(thumbnail_canvas, thumbnail_view.renderScale, viewport_x, viewport_y, false);
 	}
 }
 
@@ -297,7 +303,10 @@ function render_canvas_view(hcanvas, scale, viewport_x, viewport_y, is_helper_la
 	if (!is_helper_layer) {
 		// Draw the actual document canvas (for the thumbnail)
 		// (For the main canvas view, the helper layer is separate from (and overlaid on top of) the document canvas)
-		hctx.drawImage(main_canvas, viewport_x, viewport_y, hcanvas.width, hcanvas.height, 0, 0, hcanvas.width, hcanvas.height);
+		// The source rectangle is in image pixels and the destination in this canvas's own
+		// (device) pixels, so `scale` converts between them, same as for the previews below.
+		const { sourceWidth, sourceHeight } = calculate_view_source_size(hcanvas, scale);
+		hctx.drawImage(main_canvas, viewport_x, viewport_y, sourceWidth, sourceHeight, 0, 0, hcanvas.width, hcanvas.height);
 	}
 
 	var tools_to_preview = [...selected_tools];
@@ -626,8 +635,22 @@ function toggle_thumbnail() {
 					height = Math.round(entry.contentRect.height * devicePixelRatio);
 				}
 				if (width && height) { // If it's hidden, and then shown, it gets a width and height of 0 briefly on iOS. (This would give IndexSizeError in drawImage.)
-					thumbnail_canvas.width = width;
-					thumbnail_canvas.height = height;
+					const sizing = calculate_canvas_sizing({
+						// The observer has already resolved CSS layout and device-pixel
+						// alignment. Recover the logical size so the shared sizing contract
+						// applies those exact backing dimensions transactionally.
+						logicalWidth: width / window.devicePixelRatio,
+						logicalHeight: height / window.devicePixelRatio,
+					}, {
+						pixelRatio: window.devicePixelRatio,
+						magnification: 1,
+					});
+					if (apply_canvas_sizing(thumbnail_canvas, sizing)) {
+						// Setting width/height resets image smoothing (along with everything).
+						// The thumbnail scales the document up on high-DPI screens, so this has
+						// to stay nearest-neighbor to match the main canvas view.
+						thumbnail_canvas.ctx.disable_image_smoothing();
+					}
 				}
 				update_helper_layer_immediately(); // updates thumbnail (but also unnecessarily the helper layer)
 			}).observe(thumbnail_canvas, { box: "device-pixel-content-box" });

@@ -100,10 +100,33 @@ function default_report_failure(error, details) {
 	console.error("Canvas rendering update failed.", { error, ...details });
 }
 
+/**
+ * Work out how much of the document a view with a device-pixel backing store should show.
+ *
+ * The document is stored in image pixels but the thumbnail's backing store is sized in
+ * device pixels, so without converting between the two it shows one image pixel per
+ * *device* pixel: four times the area at half the size on a 2x display.
+ *
+ * @param {{ width: number, height: number }} canvas - backing store size, in device pixels
+ * @param {number} renderScale - device pixels per image pixel
+ * @returns {{ renderScale: number, sourceWidth: number, sourceHeight: number }}
+ */
+function calculate_view_source_size(canvas, renderScale) {
+	assert_positive_finite(canvas.width, "canvas.width");
+	assert_positive_finite(canvas.height, "canvas.height");
+	assert_positive_finite(renderScale, "renderScale");
+	return Object.freeze({
+		renderScale,
+		sourceWidth: canvas.width / renderScale,
+		sourceHeight: canvas.height / renderScale,
+	});
+}
+
 // The touch policy that used to live here moved to `canvas-interaction.js`, where it grew
 // the state model and failure reporting that a scrolling-while-drawing bug needs.
 
 export {
 	apply_canvas_sizing,
-	calculate_canvas_sizing
+	calculate_canvas_sizing,
+	calculate_view_source_size
 };
