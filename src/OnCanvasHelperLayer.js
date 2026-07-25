@@ -10,9 +10,8 @@ class OnCanvasHelperLayer extends OnCanvasObject {
 	 * @param {number} width
 	 * @param {number} height
 	 * @param {boolean} hideMainCanvasHandles
-	 * @param {number} [pixelRatio=1]
 	 */
-	constructor(x, y, width, height, hideMainCanvasHandles, pixelRatio = 1) {
+	constructor(x, y, width, height, hideMainCanvasHandles) {
 		super(x, y, width, height, hideMainCanvasHandles);
 
 		this.$el.addClass("helper-layer");
@@ -20,10 +19,9 @@ class OnCanvasHelperLayer extends OnCanvasObject {
 			pointerEvents: "none",
 		});
 		this.position();
-		this.canvas = make_canvas(this.width * pixelRatio, this.height * pixelRatio);
+		this.canvas = make_canvas(this.width, this.height);
 		this.$el.append(this.canvas);
 	}
 }
 
 export { OnCanvasHelperLayer };
-
