@@ -9,6 +9,15 @@
 var isIE = /MSIE \d|Trident.*rv:/.test(navigator.userAgent);
 
 window.onerror = function (msg, url, lineNo, columnNo, _error) {
+	var loading = document.getElementById("initial-loading");
+	if (loading) {
+		loading.setAttribute("data-state", "error");
+		loading.setAttribute("role", "alert");
+		var status = loading.querySelector(".initial-loading-status");
+		if (status) {
+			status.textContent = "JS Paint couldn't finish loading. Reload the page to try again.";
+		}
+	}
 	if (isIE) {
 		return false; // Don't need alerts postponing the "not supported" message.
 	}

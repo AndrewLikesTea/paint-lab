@@ -1396,6 +1396,14 @@ const update_palette_from_theme = () => {
 $G.on("theme-load", update_palette_from_theme);
 // #region Initialization (continued)
 update_palette_from_theme();
+requestAnimationFrame(() => {
+	const loading = document.getElementById("initial-loading");
+	if (loading) {
+		loading.remove();
+	}
+	document.body.removeAttribute("aria-busy");
+	window.dispatchEvent(new CustomEvent("jspaint-ready"));
+});
 // #endregion
 
 // #endregion

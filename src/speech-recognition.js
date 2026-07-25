@@ -1,4 +1,5 @@
 // @ts-check
+// cspell:ignore imagetracer
 // eslint-disable-next-line no-unused-vars
 /* global airbrush_size:writable, brush_size:writable, eraser_size:writable, pencil_size:writable, stroke_size:writable, pointer_active:writable, pointer_over_canvas:writable, pointer_previous:writable, pointer:writable */
 /* global $canvas_area, $status_text, button, localize, main_canvas, main_ctx, MENU_DIVIDER, selected_colors, selected_tool, selected_tools, tool_go */
@@ -14,6 +15,7 @@ export let speech_recognition_active = false;
 /** @param {ImageData} subject_imagedata */
 export let trace_and_sketch = (subject_imagedata) => { void subject_imagedata; };
 export let trace_and_sketch_stop = () => { };
+import { loadOptionalScript } from "./optional-resources.js";
 export let enable_speech_recognition = () => { };
 export let disable_speech_recognition = () => { };
 /**
@@ -1977,8 +1979,14 @@ if (speech_recognition_available) {
 		return interpretations;
 	};
 
-	trace_and_sketch = (subject_imagedata) => {
+	trace_and_sketch = async (subject_imagedata) => {
 		trace_and_sketch_stop();
+		try {
+			await loadOptionalScript("lib/imagetracer_v1.2.5.js", () => typeof ImageTracer !== "undefined");
+		} catch (error) {
+			show_error_message("Image tracing couldn't be loaded.", error);
+			return;
+		}
 
 		// @TODO: clickable cancel button? (in addition to Escape key handling and the "stop" voice command)
 

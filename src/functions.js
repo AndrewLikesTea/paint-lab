@@ -15,6 +15,7 @@ import { $G, E, TAU, debounce, from_canvas_coords, get_help_folder_icon, get_ico
 import { apply_image_transformation, draw_grid, draw_selection_box, flip_horizontal, flip_vertical, invert_monochrome, invert_rgb, rotate, stretch_and_skew, threshold_black_and_white } from "./image-manipulation.js";
 import { show_imgur_uploader } from "./imgur.js";
 import { showMessageBox } from "./msgbox.js";
+import { loadOptionalScript } from "./optional-resources.js";
 import { localStore } from "./storage.js";
 import { TOOL_CURVE, TOOL_FREE_FORM_SELECT, TOOL_POLYGON, TOOL_SELECT, TOOL_TEXT, tools } from "./tools.js";
 // `sessions.js` must be loaded after `app.js`
@@ -1963,9 +1964,9 @@ function paste(img_or_canvas) {
 	}
 }
 
-function render_history_as_gif() {
+async function render_history_as_gif() {
 	const $win = $DialogWindow();
-	$win.title("Rendering GIF");
+	$win.title("Loading GIF exporter");
 
 	const $output = $win.$main;
 	const $progress = $(E("progress")).appendTo($output).addClass("inset-deep");
@@ -1983,6 +1984,11 @@ function render_history_as_gif() {
 	$win.center();
 
 	try {
+		await loadOptionalScript("lib/gif.js/gif.js", () => typeof GIF === "function");
+		if (!$win.is(":visible")) {
+			return;
+		}
+		$win.title("Rendering GIF");
 		const width = main_canvas.width;
 		const height = main_canvas.height;
 		const gif = new GIF({
@@ -3960,7 +3966,7 @@ function read_image_file(blob, callback) {
 	let palette;
 	let monochrome = false;
 
-	blob.arrayBuffer().then((arrayBuffer) => {
+	blob.arrayBuffer().then(async (arrayBuffer) => {
 		// Helpers:
 		// "GIF".split("").map(c=>"0x"+c.charCodeAt(0).toString("16")).join(", ")
 		// [0x47, 0x49, 0x46].map(c=>String.fromCharCode(c)).join("")
@@ -4065,6 +4071,12 @@ function read_image_file(blob, callback) {
 		} else if (detected_type_id === "pdf") {
 			file_format = "application/pdf";
 
+			try {
+				await loadOptionalScript("lib/pdf.js/build/pdf.js", () => Boolean(window["pdfjs-dist/build/pdf"]));
+			} catch (error) {
+				callback(error);
+				return;
+			}
 			const pdfjs = window["pdfjs-dist/build/pdf"];
 
 			pdfjs.GlobalWorkerOptions.workerSrc = "lib/pdf.js/build/pdf.worker.js";
