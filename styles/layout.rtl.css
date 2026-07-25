@@ -1277,9 +1277,19 @@ summary {
 	/* WCAG 2.5.5 (AAA) asks for 44px, roughly the width of an adult fingertip.
 	MS Paint's tool buttons are 25px: a mouse size, and a coin flip with a finger. */
 	--touch-target-size: 44px;
-	/* The palette is 28 colors wide-ways; at a full 44px they wouldn't fit across a
-	phone even stacked four deep, so swatches get WCAG 2.5.8's 24px minimum plus room. */
-	--touch-swatch-size: 27px;
+
+	/* Palette geometry. How big a swatch is, and how many lines the palette wraps into,
+	depend on each other and on the size of the window, so they're worked out in
+	`update_touch_palette_geometry` in src/$ColorBox.js and set on the colors component
+	from there -- see that function for why media queries can't do it. These are what the
+	first paint gets, before anything has been measured: the smallest layout the palette
+	is ever given, so the initial guess can only grow into place, never overflow. */
+	--palette-swatch-size: 27px;
+	--palette-lines: 3;
+	/* How much of a swatch is padding rather than color. The padding is target you can't
+	see: a tap that lands a few pixels wide of a color still selects that color instead of
+	its neighbor, and because it's padding and not a gap, there's nowhere to miss into. */
+	--palette-swatch-padding: 5px;
 
 	/* The app draws its own pressed states; the browser's grey flash lands late and
 	lingers over the tool you just picked. */
@@ -1316,31 +1326,54 @@ crisp) and the target grows around it; zero insets plus `margin: auto` centers i
 /* --- Colors --- */
 
 .touch-device .color-button {
-	width: var(--touch-swatch-size);
-	height: var(--touch-swatch-size);
+	width: var(--palette-swatch-size);
+	height: var(--palette-swatch-size);
+	padding: var(--palette-swatch-padding);
 }
-/* $ColorBox.js measures these to decide how many swatches fit across the palette, and
-sizes the other axis to hold the rest -- so the row/column count follows from here.
-The `:root` is for specificity: the themes size this box under `.enlarge-ui` for 25px
-swatches, and half-applying that (their container, our swatches) leaves the palette
-one row deep and several screens wide. Enlarge UI mode scales the box with a transform
-on top of whatever it measures, so it copes fine with a bigger one. */
+/* Tapping the current-colors indicator swaps the foreground and background colors, so
+it's a target in its own right; give it a swatch's footprint and scale the two colors
+inside it to suit, keeping the overlap MS Paint draws them with.
+(`:root` again for specificity, over the classic 30x31 and the `.enlarge-ui` sizes.) */
+:root.touch-device .colors-component.wide .current-colors,
+:root.touch-device .colors-component.tall .current-colors {
+	width: var(--palette-swatch-size);
+	height: var(--palette-swatch-size);
+}
+.touch-device .color-selection {
+	width: calc(var(--palette-swatch-size) * 0.55);
+	height: calc(var(--palette-swatch-size) * 0.55);
+}
+.touch-device .foreground-color,
+.touch-device .colors-component.tall .foreground-color {
+	right: 3px;
+	top: 3px;
+}
+.touch-device .background-color,
+.touch-device .colors-component.tall .background-color {
+	left: 3px;
+	bottom: 3px;
+}
+/* The size and line count `update_touch_palette_geometry` in src/$ColorBox.js settled on.
+$ColorBox.js then measures the result to size the other axis, so the palette's length
+follows from here. The `:root` is for specificity: the themes size this box under
+`.enlarge-ui` for 25px swatches, and half-applying that (their container, our swatches)
+leaves the palette one row deep and several screens wide. Enlarge UI mode scales the box
+with a transform on top of whatever it measures, so it copes fine with a bigger one. */
 :root.touch-device .colors-component.wide .color-box,
 :root.touch-device .colors-component.wide .palette {
-	height: calc((var(--touch-swatch-size) + 1px) * 3);
+	height: calc((var(--palette-swatch-size) + 1px) * var(--palette-lines));
 }
 :root.touch-device .colors-component.wide {
-	height: calc((var(--touch-swatch-size) + 1px) * 3 + 15px);
+	height: calc((var(--palette-swatch-size) + 1px) * var(--palette-lines) + 15px);
 }
 :root.touch-device .colors-component.tall .color-box,
 :root.touch-device .colors-component.tall .palette {
-	width: calc((var(--touch-swatch-size) + 1px) * 3);
+	width: calc((var(--palette-swatch-size) + 1px) * var(--palette-lines));
 }
 :root.touch-device .colors-component.tall {
-	width: calc((var(--touch-swatch-size) + 1px) * 3 + 15px);
+	width: calc((var(--palette-swatch-size) + 1px) * var(--palette-lines) + 15px);
 }
-/* The current-colors indicator is one target for swapping the colors, and is already
-big enough at its classic size; just keep it centered against the deeper palette. */
+/* Keep the current-colors indicator centered against a palette deeper than it is. */
 .touch-device .colors-component.wide .color-box,
 .touch-device .colors-component.tall .color-box {
 	align-items: center;
@@ -1361,21 +1394,12 @@ big enough at its classic size; just keep it centered against the deeper palette
 /* --- Where there's less height to go around --- */
 
 /* A shallow viewport -- a phone on its side, a short phone, a netbook-sized tablet --
-can't spare 99px for the palette on top of a toolbox built from 44px buttons, so the
-palette drops back to two rows.
-(The 650px must match SHORT_VIEWPORT_MAX_HEIGHT in src/mobile-layout.js, which reserves
-room for this chrome when sizing a new document.) */
-@media (max-height: 650px) {
-	:root.touch-device .colors-component.wide .color-box,
-	:root.touch-device .colors-component.wide .palette {
-		height: calc((var(--touch-swatch-size) + 1px) * 2);
-	}
-	:root.touch-device .colors-component.wide {
-		height: calc((var(--touch-swatch-size) + 1px) * 2 + 15px);
-	}
-}
-/* And when it's also wider than it is tall, the classic tall toolbox column doesn't fit
-between the menu bar and the colors box at all -- it would be clipped, taking the last
+can't spare much height for the palette on top of a toolbox built from 44px buttons.
+That part is handled in src/$ColorBox.js, which can see how much room is actually left
+beside the canvas; what's left here is the toolbox's own shape.
+
+When the viewport is also wider than it is tall, the classic tall toolbox column doesn't
+fit between the menu bar and the colors box at all -- it would be clipped, taking the last
 tools with it. Lay the tools out four columns wide and four rows deep instead.
 Keyed on orientation, not width alone: a *narrow* short screen is a small phone held
 upright, where a 176px-wide toolbox would swallow half the screen. */
