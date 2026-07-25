@@ -8,16 +8,49 @@
 
 var isIE = /MSIE \d|Trident.*rv:/.test(navigator.userAgent);
 
-window.onerror = function (msg, url, lineNo, columnNo, _error) {
+// The loading screen covers the whole page, so anything that can stop the app
+// from starting has to also take the loading screen down or explain itself;
+// otherwise the user is left staring at a skeleton of an app forever.
+// app.js removes the element once the real UI is ready.
+function fail_to_load(reason) {
 	var loading = document.getElementById("initial-loading");
-	if (loading) {
-		loading.setAttribute("data-state", "error");
-		loading.setAttribute("role", "alert");
-		var status = loading.querySelector(".initial-loading-status");
-		if (status) {
-			status.textContent = "JS Paint couldn't finish loading. Reload the page to try again.";
-		}
+	if (!loading || loading.getAttribute("data-state") === "error") {
+		return;
 	}
+	loading.setAttribute("data-state", "error");
+	loading.setAttribute("role", "alert");
+	var status = loading.querySelector(".initial-loading-status");
+	if (status) {
+		status.textContent = "JS Paint couldn't finish loading. Reload the page to try again.";
+	}
+	if (window.console && window.console.error) {
+		window.console.error("JS Paint failed to load:", reason);
+	}
+}
+
+// A <script> that fails to load (or whose module imports fail) doesn't trigger
+// window.onerror; it only fires an error event on the element itself, which
+// doesn't bubble but can be caught in the capture phase.
+// Scripts loaded on demand (see optional-resources.js) set async=true and
+// report their own failures, so they must not take down the loading screen.
+window.addEventListener("error", function (event) {
+	var target = event.target;
+	if (target && target !== window && target.tagName === "SCRIPT" && !target.async) {
+		fail_to_load("failed to load " + target.src);
+	}
+}, true);
+
+// Last resort, for a failure mode we haven't thought of.
+// Without this, the loading screen could cover a working app indefinitely.
+var loading_watchdog = setTimeout(function () {
+	fail_to_load("timed out waiting for the app to start");
+}, 20000);
+window.addEventListener("jspaint-ready", function () {
+	clearTimeout(loading_watchdog);
+});
+
+window.onerror = function (msg, url, lineNo, columnNo, _error) {
+	fail_to_load(msg);
 	if (isIE) {
 		return false; // Don't need alerts postponing the "not supported" message.
 	}

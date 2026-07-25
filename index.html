@@ -29,7 +29,8 @@
 	<!-- <link href="lib/os-gui/build/windows-98.css" rel="stylesheet" type="text/css"> -->
 	<!-- <link href="lib/os-gui/build/windows-default.css" rel="stylesheet" type="text/css" title="Windows Default"> -->
 	<!-- <link href="lib/os-gui/build/peggys-pastels.css" rel="alternate stylesheet" type="text/css" title="Peggy's Pastels"> -->
-	<link href="lib/tracky-mouse/core/tracky-mouse.css" rel="stylesheet" type="text/css">
+	<!-- Tracky Mouse's stylesheet is loaded with its script, when Dwell Clicker or
+	Head Tracker is turned on. See src/eye-gaze-mode.js. -->
 	<!--
 		@TODO: bring these styles into OS-GUI.
 		This is a custom build of 98.css https://github.com/jdan/98.css
@@ -341,7 +342,7 @@
 			</p>
 			<p>It's powered by
 				<a href="https://trackymouse.js.org" target="_blank"><img src="images/tracky-mouse-16x16.png"
-						alt="" />Tracky Mouse</a>.
+						loading="lazy" alt="" />Tracky Mouse</a>.
 			</p>
 			<p>I recorded a short demonstration video, drawing the Tracky&nbsp;Mouse logo using Tracky&nbsp;Mouse:
 			</p>
@@ -357,7 +358,7 @@
 			</figure>
 			<a href="https://trackymouse.js.org" target="_blank">
 				<img src="lib/tracky-mouse/images/tracky-mouse-logo-512.png" width="128" height="128"
-					alt="Tracky Mouse logo" style="float: right" />
+					loading="lazy" alt="Tracky Mouse logo" style="float: right" />
 			</a>
 			<p>To try it out:</p>
 			<ul>
@@ -371,7 +372,7 @@
 			<p>Tips:</p>
 			<ul>
 				<li>You can pause dwell clicking by hovering over the pause button
-					(<img alt="an eye with three zees" src="images/classic/eye-gaze-pause.svg"
+					(<img loading="lazy" alt="an eye with three zees" src="images/classic/eye-gaze-pause.svg"
 						style="vertical-align: middle; width: 1em; height: 1em;" />)
 					in the bottom left corner.</li>
 				<li>When hovering over a window title bar, or using certain tools on the canvas,
@@ -393,7 +394,7 @@
 			<h2>Discord server</h2>
 			<figure>
 				<a href="https://discord.gg/jxQBK3k8tx" target="_blank">
-					<img width="470" height="470" src="https://flipanim.com/gif/b/h/BhZWtwfg.gif"
+					<img loading="lazy" width="470" height="470" src="https://flipanim.com/gif/b/h/BhZWtwfg.gif"
 						alt="Animation of Discord logo blinking its eyes">
 				</a>
 				<figcaption>
@@ -599,7 +600,7 @@
 		<article class="news-entry" id="news-2024-bubblegum-theme">
 			<h1>Bubblegum Theme</h1>
 			<time datetime="2024-04-27">2024-04-27</time>
-			<img width="946" height="800" style="max-width: 100%; height: auto; image-rendering: auto;"
+			<img loading="lazy" width="946" height="800" style="max-width: 100%; height: auto; image-rendering: auto;"
 				alt="Screenshot of JS Paint with the Bubblegum theme"
 				src="https://i.postimg.cc/6QwYrWjM/Screen-Shot-2024-04-27-at-14-57-48.png" />
 			<h2>Bubblegum Theme</h2>
@@ -640,7 +641,7 @@
 			</p>
 			<p>
 				I hand-edited a few of the icons, but they're mostly as they came out of the AI.
-				My favorite is the Eye Gaze Mode pause button icon (<img alt="an eye"
+				My favorite is the Eye Gaze Mode pause button icon (<img loading="lazy" alt="an eye"
 					src="images/bubblegum/eye-gaze-unpause-128x128.png"
 					style="vertical-align: middle; width: 1em; height: 1em;" />),
 				which I got for free randomly due to the AI misinterpreting "eye dropper".
@@ -715,13 +716,13 @@
 			<div
 				style="background: #c0c0c0; padding: 1em; padding-bottom: 0.1em; border-radius: .5em; border: 1px inset;">
 				Modern Light before (tool icons from Windows Vista):<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/master/images/modern/vista-tools-spaced-like-svg.png?raw=true">
 				<div style="line-height:50%;"><br></div>
 				Modern Light after (custom SVG icons):<br>
 				<!-- TODO: custom pixel-fine-tuned PNG; SVG is designed to align with the pixel grid but it's not perfect -->
 				<!-- <img alt="" src="images/modern/modern-light-tools.png"> -->
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/master/images/modern/modern-light-tools.svg?raw=true">
 			</div>
 			<p>
@@ -734,7 +735,7 @@
 				style="background: #222222; color: #aaaaaa; padding: 1em; padding-bottom: 0.1em; border-radius: .5em; border: 1px inset;">
 				Modern Dark before (tool icons from Windows Vista, with aliasing artifacts when viewed against a dark
 				background):<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/master/images/modern/vista-tools-spaced-like-svg.png?raw=true">
 				<div style="line-height:50%;"><br></div>
 				Modern Dark after (custom SVG icons):<br>
@@ -742,7 +743,7 @@
 				<!-- To be consistent, use SVG here too. At least you can zoom in and see the scalability. -->
 				<!-- Though I'd prefer a nice magnifier effect like https://lenadesign.org/2021/06/30/css-javascript-image-magnifier-glass/ -->
 				<!-- Onion skin / swipe would be nice for comparison as well. -->
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/03f934eab98f450d3e527ef8e152cc5aa003fe07/images/modern/modern-dark-tools.svg?raw=true">
 			</div>
 			<p>
@@ -760,16 +761,16 @@
 			</p>
 			<div style="background: #c0c0c0; padding: 1em; border-radius: .5em; border: 1px inset;">
 				Classic Light (still using tool icons from Windows 98):<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/03f934eab98f450d3e527ef8e152cc5aa003fe07/images/classic/tools.png?raw=true">
 			</div>
 			<div style="background: #222222; color: #aaaaaa; padding: 1em; border-radius: .5em; border: 1px inset;">
 				Classic Dark before:<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/43d68cf8eee4cf8aa30e3047955c2bb8315c92f2/images/dark/tools.png?raw=true">
 				<div style="line-height:50%;"><br></div>
 				Classic Dark after:<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/03f934eab98f450d3e527ef8e152cc5aa003fe07/images/dark/tools.png?raw=true">
 			</div>
 			<p>
@@ -796,11 +797,11 @@
 			</p>
 			<div style="background: #660c08; color: #aaaaaa; padding: 1em; border-radius: .5em; border: 1px inset;">
 				Occult before:<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/43d68cf8eee4cf8aa30e3047955c2bb8315c92f2/images/occult/tools.png?raw=true">
 				<div style="line-height:50%;"><br></div>
 				Occult after:<br>
-				<img alt=""
+				<img loading="lazy" alt=""
 					src="https://github.com/1j01/jspaint/blob/03f934eab98f450d3e527ef8e152cc5aa003fe07/images/occult/tools.png?raw=true">
 				<div style="line-height:50%;"><br></div>
 				(Still needs more ideas.)
@@ -830,7 +831,7 @@
 				Always use <b>Save As</b> (<kbd>Ctrl+Shift+S</kbd>) if you want to save a new file.
 			</p> -->
 			<p>
-				<img alt="" src="images/save.gif" width="50" height="50" style="float: right;" />
+				<img loading="lazy" alt="" src="images/save.gif" width="50" height="50" style="float: right;" />
 				<b>File > Save As</b> now asks for a file name and format.
 				PNG, GIF, and BMP are supported, including indexed color BMPs.
 			</p>
@@ -839,7 +840,7 @@
 					target="_blank">Supported File Formats</a> table for details.
 			</p>
 			<p>
-				<img alt="" src="images/idea.gif" width="33" height="26" style="float: left;" />
+				<img loading="lazy" alt="" src="images/idea.gif" width="33" height="26" style="float: left;" />
 				Tip: Use PNG if you don't have a specific reason to use another format,
 				as it has the best quality when saving.
 			</p>
@@ -880,7 +881,7 @@
 				You can even export CSS variables for use in a web design project.
 			</p>
 			<p>
-				<img alt="" src="images/idea.gif" width="33" height="26" style="float: left;" />
+				<img loading="lazy" alt="" src="images/idea.gif" width="33" height="26" style="float: left;" />
 				RIFF Palette (*.pal) is compatible with MS Paint, and GIMP Palette (*.gpl) is compatible with many open
 				source graphics programs such as Inkscape and Krita.
 			</p>
@@ -918,7 +919,7 @@
 			</p>
 			<p>
 				<a href="https://jspaint.app/about" target="_blank">
-					<img src="images/enter.gif" alt="Click to Enter" width="145" height="77" />
+					<img loading="lazy" src="images/enter.gif" alt="Click to Enter" width="145" height="77" />
 				</a>
 			</p>
 		</article>
@@ -962,7 +963,7 @@
 		<article class="news-entry" id="news-2021-saving">
 			<h1>The GUIcci Update</h1>
 			<time datetime="2021-12-08">2021-12-08</time>
-			<img width="640" height="360" style="max-width: 100%; height: auto; image-rendering: auto;" alt=""
+			<img loading="lazy" width="640" height="360" style="max-width: 100%; height: auto; image-rendering: auto;" alt=""
 				src="https://i.postimg.cc/tgBncKfJ/guicii-update.png" />
 			<h2>New Features</h2>
 			<p>
@@ -990,7 +991,7 @@
 				you can now dock it back when dragging the titlebar.
 				Previously to dock it you had to double click the titlebar, or drag it by the edge of the window.
 			</p>
-			<img alt="Area that you have to click to drag a toolbar out into a window (in green)"
+			<img loading="lazy" alt="Area that you have to click to drag a toolbar out into a window (in green)"
 				src="https://i.postimg.cc/7LB18Gcg/toolbar-drag-out-area.png" width="480" height="380"
 				style="max-width: 100%; height: auto; image-rendering: auto;" />
 			<p>
@@ -1005,17 +1006,17 @@
 				The details may be more overwhelming than useful in a lot of cases,
 				but if you need them, you can expand the details.
 			</p>
-			<img alt="Example error message box saying 'File not found', with details collapsed."
+			<img loading="lazy" alt="Example error message box saying 'File not found', with details collapsed."
 				src="https://i.postimg.cc/ZR1qpVGw/file-not-found.png" width="408" height="145"
 				style="max-width: 100%; height: auto; image-rendering: auto;">
 			<p>
 				<b>File > Exit</b> now exits to the official web desktop,
-				<a target="_blank" href="https://98.js.org"><img
+				<a target="_blank" href="https://98.js.org"><img loading="lazy"
 						src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABKklEQVR42qWTMW7DMAxFKYC+RC/hQR065xSdOyRDr9CxV8gQDzlK5g7RkLmn6CwCCimSchIoWkrAgESTj5+kHeCfFnpORCyPPiLqxgYP9gC/ZyKYEIG+CPAbn0JCr6okizmgvmdIF8BZxUhNgVdv8k3FvCdIu/u228VBnkiUGTZBzgyb1CcASBqdlhAMUEx6aAokWc8KqGCGzB+0lmMTyI0cBUmSV28zMRXzT4bECiI/l+NUZ/J0Cz0TACx6Tiwej9jfQkvIufZ8eVM1tM+1uiTHyP5P7H9IccvtxGCVSg0W6ZDUdz6cYbe8DgAHKKf3P9j8bnhQ0rSJY0DcOm2gwCFSugKqozT51V704xoDQItFWMeTFp+ZbQEGtm4o3/hsoLa1IaC3ocf/4QotsZxI//135gAAAABJRU5ErkJggg=="
 						width="16" height="16" alt=""> 98.js.org</a>,
 				a re-creation of Windows 98, full of games and applications.
 			</p>
-			<img class="inset-deep" src="https://i.postimg.cc/SKHrYpx3/98-js-org-screenshot.png"
+			<img loading="lazy" class="inset-deep" src="https://i.postimg.cc/SKHrYpx3/98-js-org-screenshot.png"
 				alt="The 98.js desktop featuring desktop icons, a taskbar, and various application windows."
 				style="max-width: 100%; height: auto; image-rendering: auto;">
 			<p>
@@ -1138,14 +1139,14 @@
 				who will then smile a nasty smile and steal Christmas from you.
 				You can get it back with <b>Extras > Theme > Winter</b>.
 			</p>
-			<img class="inset-deep" alt="Winter theme screenshot with candy canes and a text box saying Enjoy!"
+			<img loading="lazy" class="inset-deep" alt="Winter theme screenshot with candy canes and a text box saying Enjoy!"
 				src="https://i.postimg.cc/SxFtjy8z/winter-theme-enjoy.png" width="440" height="380"
 				style="max-width: 100%; height: auto; image-rendering: auto;" />
 		</article>
 		<article class="news-entry" id="news-2020-accessibility-update">
 			<h1>The Accessibility Update</h1>
 			<time datetime="2020-12-20">2020-12-20</time>
-			<img width="965" height="399" style="max-width: 100%; height: auto; image-rendering: auto;"
+			<img loading="lazy" width="965" height="399" style="max-width: 100%; height: auto; image-rendering: auto;"
 				alt="Hello in several languages, eye gaze guiding a cursor, and a sea lion barking into a microphone."
 				src="https://i.postimg.cc/j29yrZbm/untitled-23.png" />
 			<h2>Multi-Lingual Support</h2>
@@ -1165,11 +1166,11 @@
 				To change the language, go to <b>Extras > Language</b>.
 				Your preferred language may already be detected, if specified in system or browser settings.
 			</p>
-			<img width="1280" height="720" style="max-width: 100%; height: auto; image-rendering: auto;"
+			<img loading="lazy" width="1280" height="720" style="max-width: 100%; height: auto; image-rendering: auto;"
 				alt="26 languages, right off the bat!" src="https://i.postimg.cc/G2bH92fp/language-menu.png" />
 			<p>For Arabic and Hebrew, right-to-left layout is supported!</p>
 			<p>I tried my hand at some Arabic calligraphy...</p>
-			<img width="1141" height="800" style="max-width: 100%; height: auto; image-rendering: auto;"
+			<img loading="lazy" width="1141" height="800" style="max-width: 100%; height: auto; image-rendering: auto;"
 				alt="Calligraphy where the shapes of the tools in Paint make up Arabic words for them."
 				src="https://i.postimg.cc/NFX2TTp1/untitled-45.png" />
 			<p>
@@ -1181,7 +1182,7 @@
 				them.)
 			</p>
 			<h2>Eye Gaze Mode</h2>
-			<img width="511" height="360" style="max-width: 100%; height: auto; image-rendering: auto;"
+			<img loading="lazy" width="511" height="360" style="max-width: 100%; height: auto; image-rendering: auto;"
 				alt="You can use eye gaze or head movements to control the cursor."
 				src="https://i.postimg.cc/2yC137gc/20.png" />
 			<p>Eye Gaze Mode lets you control JS Paint without using your hands.</p>
@@ -1211,7 +1212,7 @@
 				It can also be frustrating, and takes some practice to master.
 			</p>
 			<p>
-				A good place to start is coloring line art using just the Fill tool (<img src="help/p_paint.gif"
+				A good place to start is coloring line art using just the Fill tool (<img loading="lazy" src="help/p_paint.gif"
 					width="15" height="11" alt="">):
 			</p>
 			<ul>
@@ -1240,7 +1241,7 @@
 				I decided to make this available as a separate option. Access with <b>Extras > Vertical Color Box</b>.
 			</p>
 			<h2>Speech Recognition</h2>
-			<img width="549" height="275" style="max-width: 100%; height: auto; image-rendering: auto;"
+			<img loading="lazy" width="549" height="275" style="max-width: 100%; height: auto; image-rendering: auto;"
 				alt="The sea lion says &quot;Art! Art! Art!&quot; into a microphone."
 				src="https://i.postimg.cc/BnQ8cpY2/Art-Art-Art.png" />
 			<p>
@@ -1268,7 +1269,7 @@
 				didn't work for some people.</p>
 			<p>Access with <b>Colors > Edit Colors</b> or double click a color in the palette to edit.</p>
 			<figure>
-				<img width="496" height="350" style="max-width: 100%; height: auto; image-rendering: auto;" alt=""
+				<img loading="lazy" width="496" height="350" style="max-width: 100%; height: auto; image-rendering: auto;" alt=""
 					src="https://i.postimg.cc/cLNgWH0r/Peek-2020-12-04-00-31.gif" />
 				<figcaption>An animation morphing between JS Paint and MS Paint's color picking dialog. It's pretty
 					close, other than the font.</figcaption>
@@ -1297,14 +1298,14 @@
 		<article class="news-entry" id="news-2019-winter-update">
 			<h1>Winter Update</h1>
 			<time datetime="2019-12-20">2019-12-20</time>
-			<img width="563" height="334" style="max-width: 100%; height: auto; image-rendering: auto;" alt=""
+			<img loading="lazy" width="563" height="334" style="max-width: 100%; height: auto; image-rendering: auto;" alt=""
 				src="https://i.postimg.cc/63Wc6vpG/2019-winter-update-candy-cane.gif" />
 			<h2>Winter Theme</h2>
 			<p>
 				A new UI skin is available, under <b>Extras &gt; Themes &gt; Winter</b>, featuring winter and holiday
 				icons, festive fonts, and a palette with seasonal colors and peppermint patterns.
 			</p>
-			<img width="256" height="16" alt="" src="images/winter/tools.png" />
+			<img loading="lazy" width="256" height="16" alt="" src="images/winter/tools.png" />
 			<p>
 				Merry Christmas and happy Hanukkah!
 			</p>
@@ -1467,10 +1468,12 @@
 	<script src="lib/jquery-3.4.1.min.js"></script>
 	<!-- pako is used by UPNG.js and UTIF.js -->
 	<script src="lib/pako-2.0.3.min.js"></script>
+	<!-- PNG is the default format: it's what Save and Export PNG produce, and what
+	drawings saved in the browser are stored as. It stays here so those never wait. -->
 	<script src="lib/UPNG.js"></script>
-	<script src="lib/UTIF.js"></script>
-	<script src="lib/bmp.js"></script>
-	<script src="lib/anypalette-0.6.0.js"></script>
+	<!-- The palette library (anypalette, by far the largest file in the app) and the
+	TIFF and BMP codecs are loaded on demand instead; see src/optional-resources.js.
+	They're only reached through a dialog, where a moment's load isn't felt. -->
 	<script src="lib/FileSaver.js"></script>
 	<script src="lib/font-detective.js"></script>
 	<script src="lib/libtess.min.js"></script>

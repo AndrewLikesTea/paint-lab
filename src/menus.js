@@ -4,13 +4,14 @@
 // import { available_languages, get_iso_language_name, get_language, get_language_emoji, get_language_endonym, localize, set_language } from "./app-localization.js";
 import { OnCanvasTextBox } from "./OnCanvasTextBox.js";
 import { show_edit_colors_window } from "./edit-colors.js";
-import { palette_formats } from "./file-format-data.js";
-import { are_you_sure, change_url_param, choose_file_to_paste, clear, delete_selection, deselect, edit_copy, edit_cut, edit_paste, file_load_from_url, file_new, file_open, file_print, file_save, file_save_as, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, redo, render_history_as_gif, sanity_check_blob, save_selection_to_file, select_all, set_magnification, show_about_paint, show_custom_zoom_window, show_document_history, show_export_png_dialog, show_file_format_errors, show_multi_user_setup_dialog, show_news, toggle_grid, toggle_thumbnail, undo, view_bitmap } from "./functions.js";
+import { get_palette_formats } from "./file-format-data.js";
+import { are_you_sure, change_url_param, choose_file_to_paste, clear, delete_selection, deselect, edit_copy, edit_cut, edit_paste, file_load_from_url, file_new, file_open, file_print, file_save, file_save_as, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, redo, render_history_as_gif, sanity_check_blob, save_selection_to_file, select_all, set_magnification, show_about_paint, show_custom_zoom_window, show_document_history, show_error_message, show_export_png_dialog, show_file_format_errors, show_multi_user_setup_dialog, show_news, toggle_grid, toggle_thumbnail, undo, view_bitmap } from "./functions.js";
 import { show_help } from "./help.js";
 import { $G, get_rgba_from_color, is_discord_embed } from "./helpers.js";
 import { show_imgur_uploader } from "./imgur.js";
 import { manage_storage } from "./manage-storage.js";
 import { showMessageBox } from "./msgbox.js";
+import { load_palette_library } from "./optional-resources.js";
 import { show_open_from_browser_dialog, show_save_to_browser_dialog } from "./saved-drawings.js";
 import { simulateRandomGesturesPeriodically, simulatingGestures, stopSimulatingGestures } from "./simulate-random-gestures.js";
 import { speech_recognition_active, speech_recognition_available } from "./speech-recognition.js";
@@ -789,7 +790,13 @@ const menus = {
 				"get colors", "load colors", "load color palette", "load palette", "load color palette file", "load palette file", "load list of colors",
 			],
 			action: async () => {
-				const { file } = await systemHooks.showOpenFileDialog({ formats: palette_formats });
+				try {
+					await load_palette_library();
+				} catch (error) {
+					show_error_message("Palette file support couldn't be loaded.", error);
+					return;
+				}
+				const { file } = await systemHooks.showOpenFileDialog({ formats: get_palette_formats() });
 				AnyPalette.loadPalette(file, (error, new_palette) => {
 					if (error) {
 						show_file_format_errors({ as_palette_error: error });
@@ -807,7 +814,13 @@ const menus = {
 			speech_recognition: [
 				"save colors", "save list of colors", "save color palette", "save palette", "save color palette file", "save palette file",
 			],
-			action: () => {
+			action: async () => {
+				try {
+					await load_palette_library();
+				} catch (error) {
+					show_error_message("Palette file support couldn't be loaded.", error);
+					return;
+				}
 				const ap = new AnyPalette.Palette();
 				ap.name = "JS Paint Saved Colors";
 				ap.numberOfColumns = 16; // 14?
@@ -822,7 +835,7 @@ const menus = {
 				systemHooks.showSaveFileDialog({
 					dialogTitle: localize("Save Colors"),
 					defaultFileName: localize("untitled.pal"),
-					formats: palette_formats,
+					formats: get_palette_formats(),
 					getBlob: (format_id) => {
 						const file_content = AnyPalette.writePalette(ap, AnyPalette.formats[format_id]);
 						const blob = new Blob([file_content], { type: "text/plain" });

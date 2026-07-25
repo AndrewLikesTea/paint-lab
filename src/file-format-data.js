@@ -111,26 +111,35 @@ const image_format_categories = (image_formats) => {
 };
 */
 
-/** @type {PaletteFileFormat[]} */
-const palette_formats = [];
-for (const [format_id, format] of Object.entries(AnyPalette.formats)) {
-	if (format.write) {
-		const inside_parens = format.fileExtensions.map((extension) => `*.${extension}`).join(";");
-		palette_formats.push({
-			formatID: format_id,
-			name: format.name,
-			nameWithExtensions: `${format.name} (${inside_parens})`,
-			extensions: format.fileExtensions,
-		});
+/**
+ * The palette formats come from AnyPalette.js, which is by far the largest
+ * library in the app and is only needed for Get Colors / Save Colors, so it's
+ * loaded on demand. Await `load_palette_library()` before calling this.
+ * @returns {PaletteFileFormat[]}
+ */
+function get_palette_formats() {
+	/** @type {PaletteFileFormat[]} */
+	const palette_formats = [];
+	for (const [format_id, format] of Object.entries(AnyPalette.formats)) {
+		if (format.write) {
+			const inside_parens = format.fileExtensions.map((extension) => `*.${extension}`).join(";");
+			palette_formats.push({
+				formatID: format_id,
+				name: format.name,
+				nameWithExtensions: `${format.name} (${inside_parens})`,
+				extensions: format.fileExtensions,
+			});
+		}
 	}
+	palette_formats.sort((a, b) =>
+		// Order important formats first, starting with RIFF PAL format:
+		+(b.formatID === "RIFF_PALETTE") - +(a.formatID === "RIFF_PALETTE") ||
+		+(b.formatID === "GIMP_PALETTE") - +(a.formatID === "GIMP_PALETTE") ||
+		0
+	);
+	return palette_formats;
 }
-palette_formats.sort((a, b) =>
-	// Order important formats first, starting with RIFF PAL format:
-	+(b.formatID === "RIFF_PALETTE") - +(a.formatID === "RIFF_PALETTE") ||
-	+(b.formatID === "GIMP_PALETTE") - +(a.formatID === "GIMP_PALETTE") ||
-	0
-);
 
-export { formats_unique_per_file_extension, image_formats, palette_formats };
+export { formats_unique_per_file_extension, get_palette_formats, image_formats };
 // Temporary globals until all dependent code is converted to ES Modules
 window.formats_unique_per_file_extension = formats_unique_per_file_extension; // used by electron-injected.js
