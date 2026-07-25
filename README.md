@@ -525,6 +525,12 @@ Once you have a concept of a file handle, you can implement file pickers using t
 | **Colors > Save Colors** | Same as **File > Save As** |
 | **Colors > Get Colors** | Same as **File > Open** |
 
+Note: the **Set As Wallpaper** commands are only shown where there's a desktop to set a wallpaper on:
+the Electron app, or a *same-origin* containing page (which can provide the hooks above).
+They're hidden in an ordinary browser tab, where the app can't do what the commands say.
+Likewise, **File > Exit** is hidden in an ordinary browser tab, and shown in the Electron app,
+an installed PWA, or an embedded frame.
+
 #### Loading a file initially
 
 To start the app with a file loaded for editing,
@@ -557,6 +563,8 @@ But this won't set up the file handle for saving.
 #### Integrating Set as Wallpaper
 
 You can define two functions to set the wallpaper, which will be used by **File > Set As Wallpaper (Tiled)** and **File > Set As Wallpaper (Centered)**.
+
+These menu items are shown when the app is embedded in a same-origin page (as well as in the Electron app), so they'll be there for you to hook into. They're hidden when the app is loaded directly in a browser tab, or embedded cross-origin, since a page from another origin can't define the hooks.
 
 - [`systemHooks.setWallpaperTiled`][]` = (canvas) => { ... };`
 - [`systemHooks.setWallpaperCentered`][]` = (canvas) => { ... };`

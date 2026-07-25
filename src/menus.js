@@ -15,6 +15,45 @@ import { simulateRandomGesturesPeriodically, simulatingGestures, stopSimulatingG
 import { speech_recognition_active, speech_recognition_available } from "./speech-recognition.js";
 import { get_theme, set_theme } from "./theme.js";
 
+// #region Platform capabilities
+// The app runs in several shells: an ordinary browser tab, an installed PWA window,
+// an embedded frame (98.js.org, or the Discord Activity), and the Electron desktop app.
+// Menu items that need an operating system or a host page behind them are gated on the flags below,
+// with only_if(), so the web app doesn't offer actions that can't do what their labels say.
+// (Removing an item also removes its speech recognition phrases and its Electron menu entry,
+// since both are derived from this same menu definition.)
+// Note: these are evaluated once, when this module builds the menus.
+
+/** The Electron desktop app (see electron-injected.js), which has real OS integration. */
+const is_desktop_app = Boolean(window.is_electron_app);
+
+/**
+ * A same-origin containing page, such as 98.js.org, which can override `systemHooks`
+ * and `window.close()` to provide desktop-like integration. (See "Embed in your website" in the readme.)
+ * A host page typically installs its hooks asynchronously, after the app loads, so we can't
+ * test for individual hooks here; the presence of a same-origin host is the signal we have.
+ * `frameElement` is null for a cross-origin embed, which by definition can't override anything.
+ */
+const in_host_page = (() => {
+	try {
+		return Boolean(window.frameElement);
+	} catch (_error) {
+		// Cross-origin containing page (spec says null, but be defensive)
+		return false;
+	}
+})();
+
+/** An installed PWA, i.e. an app window rather than a browser tab. (Deliberately excluding `fullscreen`, which a mere tab can match with F11.) */
+const is_app_window = window.matchMedia?.("(display-mode: standalone), (display-mode: minimal-ui), (display-mode: window-controls-overlay)").matches ?? false;
+
+/** Whether quitting is a concept that exists in this shell. In a browser tab it isn't; the tab is the user's, not ours. */
+const can_exit_app = is_desktop_app || is_app_window || in_host_page || is_discord_embed;
+
+/** Whether there's a desktop to set a wallpaper on: an OS, or a host page's simulated desktop. */
+const can_set_wallpaper = is_desktop_app || in_host_page;
+
+// #endregion
+
 /** @type {OSGUITopLevelMenus} */
 const menus = {
 	[localize("&File")]: [
@@ -193,7 +232,7 @@ const menus = {
 			description: localize("Prints the active document and sets printing options."),
 		},
 		MENU_DIVIDER,
-		{
+		...only_if(can_set_wallpaper, {
 			label: localize("Set As &Wallpaper (Tiled)"),
 			speech_recognition: [
 				"set as wallpaper",
@@ -205,8 +244,7 @@ const menus = {
 			],
 			action: () => { systemHooks.setWallpaperTiled(main_canvas); },
 			description: localize("Tiles this bitmap as the desktop background."),
-		},
-		{
+		}, {
 			label: localize("Set As Wallpaper (&Centered)"), // in mspaint it's Wa&llpaper
 			speech_recognition: [
 				"set as wallpaper centered",
@@ -217,15 +255,17 @@ const menus = {
 			],
 			action: () => { systemHooks.setWallpaperCentered(main_canvas); },
 			description: localize("Centers this bitmap as the desktop background."),
-		},
+		}),
 		MENU_DIVIDER,
-		{
+		...only_if(is_desktop_app, {
+			// A placeholder for MS Paint fidelity; there's no recent files list yet, and in a browser
+			// tab there's nothing it could list, since documents aren't files on disk there.
 			label: localize("Recent File"),
 			enabled: false, // @TODO for desktop app
 			description: localize(""),
-		},
+		}),
 		MENU_DIVIDER,
-		{
+		...only_if(can_exit_app, {
 			label: localize("E&xit"),
 			...shortcut(window.is_electron_app ? "Alt+F4" : ""), // Alt+F4 closes the browser window (in most window managers)
 			speech_recognition: [
@@ -265,15 +305,17 @@ const menus = {
 						// In a cross-origin iframe, most likely
 						// @TODO: establish postMessage API
 					}
-					// In a cross-origin iframe, or same origin but without custom close(), or top level:
-					// Not all browsers support close() for closing a tab,
+					// Same origin host page but without a custom close(), or an installed PWA:
+					// Not all browsers support close() for closing a window,
 					// so redirect instead. Exit to the official web desktop.
+					// (This item isn't shown in an ordinary browser tab, where navigating away
+					// from the user's tab would be a rude surprise. See can_exit_app.)
 					// @ts-ignore
 					window.location = "https://98.js.org/";
 				});
 			},
 			description: localize("Quits Paint."),
-		},
+		}),
 	],
 	[localize("&Edit")]: [
 		{
@@ -1407,6 +1449,10 @@ const menus = {
 };
 
 for (const [top_level_menu_key, menu] of Object.entries(menus)) {
+	menus[top_level_menu_key] = remove_redundant_dividers(menu);
+}
+
+for (const [top_level_menu_key, menu] of Object.entries(menus)) {
 	const top_level_menu_name = top_level_menu_key.replace(/&/, "");
 	const add_literal_navigation_speech_recognition = (menu, ancestor_names) => {
 		for (const menu_item of menu) {
@@ -1439,6 +1485,42 @@ for (const [top_level_menu_key, menu] of Object.entries(menus)) {
 }
 
 export { menus };
+
+/**
+ * Includes menu items only where they can actually do what they say.
+ * Any dividers left dangling by an omitted item are cleaned up by remove_redundant_dividers(),
+ * so each item can be gated without the surrounding items knowing about it.
+ * @param {boolean} condition
+ * @param {...OSGUIMenuFragment} items
+ * @returns {OSGUIMenuFragment[]}
+ */
+function only_if(condition, ...items) {
+	return condition ? items : [];
+}
+
+/**
+ * Removes dividers that would render as leading, trailing, or doubled separators,
+ * which can happen when items are omitted per platform. Recurses into submenus.
+ * @param {OSGUIMenuFragment[]} menu
+ * @returns {OSGUIMenuFragment[]}
+ */
+function remove_redundant_dividers(menu) {
+	const items = menu.filter((item, index) =>
+		item !== MENU_DIVIDER || (index > 0 && menu[index - 1] !== MENU_DIVIDER)
+	);
+	while (items[0] === MENU_DIVIDER) {
+		items.shift();
+	}
+	while (items[items.length - 1] === MENU_DIVIDER) {
+		items.pop();
+	}
+	for (const item of items) {
+		if (item !== MENU_DIVIDER && "submenu" in item && item.submenu) {
+			item.submenu = remove_redundant_dividers(item.submenu);
+		}
+	}
+	return items;
+}
 
 /**
  * Expands a shortcut label into an object with the label and a corresponding ARIA key shortcuts value.
