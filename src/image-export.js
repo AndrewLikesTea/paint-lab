@@ -232,7 +232,102 @@ function can_share_image_files() {
 	}
 }
 
+/**
+ * Takes a side-effect-free snapshot of the sharing APIs this browser exposes.
+ *
+ * Presence is deliberately checked without requesting permission. Permissions
+ * remain scoped to the user's click, and an API that later rejects simply
+ * rolls forward to the next fallback.
+ * @param {Navigator} navigator_object
+ * @param {typeof ClipboardItem | undefined} ClipboardItemConstructor
+ * @returns {Readonly<{ web_share: boolean, clipboard: boolean, download: true }>}
+ */
+function sharing_capabilities(
+	navigator_object = navigator,
+	ClipboardItemConstructor = globalThis.ClipboardItem,
+) {
+	let web_share = false;
+	if (
+		typeof File === "function" &&
+		typeof navigator_object.share === "function" &&
+		typeof navigator_object.canShare === "function"
+	) {
+		try {
+			web_share = navigator_object.canShare({
+				files: [new File([], "image.png", { type: "image/png" })],
+			});
+		} catch (_error) {
+			// A broken capability probe is an unavailable capability.
+		}
+	}
+	return Object.freeze({
+		web_share,
+		clipboard: typeof navigator_object.clipboard?.write === "function" &&
+		typeof ClipboardItemConstructor === "function",
+		// The caller supplies the existing download implementation, so this
+		// route has no browser permission or capability probe.
+		download: true,
+	});
+}
+
+/**
+ * Shares an already-encoded image through a deterministic fallback chain.
+ *
+ * Web Share -> Clipboard -> Download. Each step only receives the image data
+ * it needs. A dismissed native share sheet is final (downloading after a user
+ * explicitly cancelled would be surprising); all other failures roll forward.
+ *
+ * @param {{
+ *   blob: Blob,
+ *   file_name: string,
+ *   download: (blob: Blob, file_name: string) => void,
+ *   navigator_object?: Navigator,
+ *   ClipboardItemConstructor?: typeof ClipboardItem,
+ *   warn?: (message: string, error: unknown) => void,
+ * }} options
+ * @returns {Promise<"shared" | "copied" | "downloaded" | "cancelled">}
+ */
+async function share_image_with_fallback({
+	blob,
+	file_name,
+	download,
+	navigator_object = navigator,
+	ClipboardItemConstructor = globalThis.ClipboardItem,
+	warn = () => {},
+}) {
+	const capabilities = sharing_capabilities(navigator_object, ClipboardItemConstructor);
+	if (capabilities.web_share) {
+		try {
+			await navigator_object.share({
+				files: [new File([blob], file_name, { type: blob.type })],
+			});
+			return "shared";
+		} catch (error) {
+			if (/** @type {Error} */ (error)?.name === "AbortError") {
+				return "cancelled";
+			}
+			warn("Web Share failed; trying the clipboard.", error);
+		}
+	}
+	if (capabilities.clipboard) {
+		try {
+			await navigator_object.clipboard.write([
+				new ClipboardItemConstructor(Object.defineProperty({}, blob.type, {
+					value: blob,
+					enumerable: true,
+				})),
+			]);
+			return "copied";
+		} catch (error) {
+			warn("Clipboard write failed; downloading instead.", error);
+		}
+	}
+	download(blob, file_name);
+	return "downloaded";
+}
+
 export {
 	can_share_image_files, export_dimensions, export_image_blob, EXPORT_MIME_TYPES, EXPORT_SCALES,
-	make_export_config, release_canvas, render_export_canvas, report_export_error
+	make_export_config, release_canvas, render_export_canvas, report_export_error,
+	share_image_with_fallback, sharing_capabilities
 };

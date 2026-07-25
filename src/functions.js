@@ -12,7 +12,7 @@ import { apply_canvas_sizing, calculate_canvas_sizing, calculate_view_source_siz
 import { default_palette } from "./color-data.js";
 import { image_formats } from "./file-format-data.js";
 import { $G, E, TAU, debounce, from_canvas_coords, get_help_folder_icon, get_icon_for_tool, get_rgba_from_color, is_discord_embed, is_pride_month, make_canvas, render_access_key, to_canvas_coords } from "./helpers.js";
-import { EXPORT_SCALES, can_share_image_files, export_dimensions, export_image_blob, make_export_config, report_export_error } from "./image-export.js";
+import { EXPORT_SCALES, export_dimensions, export_image_blob, make_export_config, report_export_error, share_image_with_fallback } from "./image-export.js";
 import { apply_image_transformation, draw_grid, draw_selection_box, flip_horizontal, flip_vertical, invert_monochrome, invert_rgb, rotate, stretch_and_skew, threshold_black_and_white } from "./image-manipulation.js";
 import { show_imgur_uploader } from "./imgur.js";
 import { showMessageBox } from "./msgbox.js";
@@ -1400,25 +1400,27 @@ function show_export_png_dialog() {
 		}
 	});
 
-	// Only offered when the platform can actually share files. Most desktop
-	// browsers can't, and a Share button that always errors is worse than none.
-	if (can_share_image_files()) {
-		$w.$Button(localize("Share"), async () => {
-			const config = begin_export();
-			try {
-				const blob = await export_image_blob(main_canvas, config, write_image_file);
-				await navigator.share({
-					files: [new File([blob], export_file_name(config), { type: config.mime_type })],
-				});
-			} catch (error) {
-				// Dismissing the share sheet is a choice, not a failure.
-				if (/** @type {Error} */ (error)?.name === "AbortError") {
-					return;
-				}
-				report_export_error(error, localize("Failed to share the image."), show_error_message);
+	$w.$Button(localize("Share"), async () => {
+		const config = begin_export();
+		try {
+			const blob = await export_image_blob(main_canvas, config, write_image_file);
+			const result = await share_image_with_fallback({
+				blob,
+				file_name: export_file_name(config),
+				// FileSaver is the established browser download path. Keeping it
+				// injected makes the fallback explicit and easy to roll back.
+				download: (download_blob, download_name) => saveAs(download_blob, download_name),
+				warn: (message, error) => window.console?.warn(message, error),
+			});
+			if (result === "copied") {
+				window.console?.log(`Shared image by copying it to the clipboard at ${config.scale}x.`);
+			} else if (result === "downloaded") {
+				window.console?.log(`Sharing APIs unavailable; downloaded the image at ${config.scale}x.`);
 			}
-		});
-	}
+		} catch (error) {
+			report_export_error(error, localize("Failed to share the image."), show_error_message);
+		}
+	});
 
 	$w.$Button(localize("Cancel"), () => {
 		$w.close();
