@@ -119,26 +119,40 @@ function $ColorBox(vertical) {
 		});
 	};
 
+	// The palette wraps within a size fixed in CSS on its cross axis: two rows (or columns)
+	// of 15px swatches classically, and fewer, larger ones on a touch device, where it also
+	// changes with the viewport (see "Touch and phone layout" in styles/layout.css).
+	// So measure how many swatches fit across, and size the main axis to hold the rest.
+	// Note: this doesn't work until the colors box is in the DOM.
+	const update_palette_wrapping = () => {
+		const $some_button = $palette.find(".color-button");
+		if (!$some_button.length) {
+			return;
+		}
+		const style = getComputedStyle($some_button[0]);
+		const width_per_button =
+			$some_button.outerWidth() +
+			parseFloat(style.getPropertyValue("margin-left")) +
+			parseFloat(style.getPropertyValue("margin-right"));
+		const height_per_button =
+			$some_button.outerHeight() +
+			parseFloat(style.getPropertyValue("margin-top")) +
+			parseFloat(style.getPropertyValue("margin-bottom"));
+		if (vertical) {
+			const columns = Math.max(1, Math.floor($palette.width() / width_per_button));
+			$palette.height(Math.ceil(palette.length / columns) * height_per_button);
+		} else {
+			const rows = Math.max(1, Math.floor($palette.height() / height_per_button));
+			$palette.width(Math.ceil(palette.length / rows) * width_per_button);
+		}
+	};
+
 	const build_palette = () => {
 		$palette.empty();
 
 		palette.forEach(make_color_button);
 
-		// Note: this doesn't work until the colors box is in the DOM
-		const $some_button = $palette.find(".color-button");
-		if (vertical) {
-			const height_per_button =
-				$some_button.outerHeight() +
-				parseFloat(getComputedStyle($some_button[0]).getPropertyValue("margin-top")) +
-				parseFloat(getComputedStyle($some_button[0]).getPropertyValue("margin-bottom"));
-			$palette.height(Math.ceil(palette.length / 2) * height_per_button);
-		} else {
-			const width_per_button =
-				$some_button.outerWidth() +
-				parseFloat(getComputedStyle($some_button[0]).getPropertyValue("margin-left")) +
-				parseFloat(getComputedStyle($some_button[0]).getPropertyValue("margin-right"));
-			$palette.width(Math.ceil(palette.length / 2) * width_per_button);
-		}
+		update_palette_wrapping();
 
 		// the "last foreground color button" starts out as the first in the palette
 		$c.data("$last_fg_color_button", $palette.find(".color-button:first-child"));
@@ -161,6 +175,7 @@ function $ColorBox(vertical) {
 	$c = /** @type {JQuery<HTMLDivElement> & I$Component & I$ColorBox} */ ($c);
 
 	$c.rebuild_palette = build_palette;
+	$c.update_palette_wrapping = update_palette_wrapping;
 
 	return $c;
 }
