@@ -1247,6 +1247,75 @@ function file_save_as(maybe_saved_callback = () => { }, update_from_saved = true
 	});
 }
 
+/** @type {OSGUI$Window} */
+let $export_png_window;
+function show_export_png_dialog() {
+	if ($export_png_window) {
+		$export_png_window.close();
+	}
+	const $w = $DialogWindow(localize("Export PNG"));
+	$export_png_window = $w;
+	$w.addClass("horizontal-buttons");
+	$w.$main.append(`
+		<p>${localize("Choose the size of the exported image.")}</p>
+		<fieldset>
+			<legend>${localize("Scale")}</legend>
+			<div class="fieldset-body">
+				<div class="radio-field">
+					<input type="radio" name="export-png-scale" id="export-png-scale-1" value="1" checked aria-keyshortcuts="Alt+1 1">
+					<label for="export-png-scale-1">${render_access_key("&1x")} (${main_canvas.width} × ${main_canvas.height})</label>
+				</div>
+				<div class="radio-field">
+					<input type="radio" name="export-png-scale" id="export-png-scale-2" value="2" aria-keyshortcuts="Alt+2 2">
+					<label for="export-png-scale-2">${render_access_key("&2x")} (${main_canvas.width * 2} × ${main_canvas.height * 2})</label>
+				</div>
+				<div class="radio-field">
+					<input type="radio" name="export-png-scale" id="export-png-scale-4" value="4" aria-keyshortcuts="Alt+4 4">
+					<label for="export-png-scale-4">${render_access_key("&4x")} (${main_canvas.width * 4} × ${main_canvas.height * 4})</label>
+				</div>
+			</div>
+		</fieldset>
+	`);
+
+	$w.$Button(localize("Export"), () => {
+		const scale = Number($w.$main.find("input[name='export-png-scale']:checked").val());
+		$w.close();
+		deselect();
+
+		let export_canvas;
+		try {
+			export_canvas = make_canvas(main_canvas.width * scale, main_canvas.height * scale);
+			export_canvas.ctx.imageSmoothingEnabled = false;
+			export_canvas.ctx.drawImage(main_canvas, 0, 0, export_canvas.width, export_canvas.height);
+		} catch (error) {
+			show_error_message(localize("Failed to save document."), error);
+			return;
+		}
+
+		const png_format = image_formats.filter(({ mimeType }) => mimeType === "image/png");
+		const name_without_extension = file_name.replace(/\.[^.]*$/, "");
+		systemHooks.showSaveFileDialog({
+			dialogTitle: localize("Export PNG"),
+			defaultFileName: `${name_without_extension}${scale === 1 ? "" : `@${scale}x`}.png`,
+			defaultFileFormatID: "image/png",
+			formats: png_format,
+			getBlob: () => new Promise((resolve) => {
+				write_image_file(export_canvas, "image/png", resolve);
+			}),
+		});
+	}, { type: "submit" });
+	$w.$Button(localize("Cancel"), () => {
+		$w.close();
+	});
+	$w.on("closed", () => {
+		if ($export_png_window === $w) {
+			$export_png_window = null;
+		}
+	});
+	$w.center();
+	$w.$main.find("input[name='export-png-scale']").first().focus();
+}
+
 function file_print() {
 	if (is_discord_embed) {
 		// closest localized string: "Could not start print job."
@@ -4226,7 +4295,7 @@ export {
 	edit_copy, edit_cut, edit_paste, exit_fullscreen_if_ios, file_load_from_url, file_new, file_open, file_print, file_save,
 	file_save_as, getSelectionText, get_all_url_params, get_history_ancestors, get_tool_by_id, get_uris, get_url_param, go_to_history_node, handle_keyshortcuts, has_any_transparency, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, load_image_from_uri, load_theme_from_text, make_history_node, make_monochrome_palette, make_monochrome_pattern, make_opaque, make_or_update_undoable, make_stripe_pattern, meld_selection_into_canvas,
 	meld_textbox_into_canvas, open_from_file, open_from_image_info, paste, paste_image_from_file, please_enter_a_number, read_image_file, redo, render_canvas_view, render_history_as_gif, reset_canvas_and_history, reset_file, reset_selected_colors, resize_canvas_and_save_dimensions, resize_canvas_without_saving_dimensions, sanity_check_blob, save_as_prompt, save_selection_to_file, select_all, select_tool, select_tools, set_all_url_params, set_magnification, show_about_paint, show_convert_to_black_and_white, show_custom_zoom_window, show_document_history, show_error_message, show_file_format_errors, show_multi_user_setup_dialog, show_news, show_resource_load_error_message, switch_to_polychrome_palette, toggle_grid,
-	toggle_thumbnail, try_exec_command, undo, undoable, update_canvas_rect, update_css_classes_for_conditional_messages, update_disable_aa, update_from_saved_file, update_helper_layer,
+	show_export_png_dialog, toggle_thumbnail, try_exec_command, undo, undoable, update_canvas_rect, update_css_classes_for_conditional_messages, update_disable_aa, update_from_saved_file, update_helper_layer,
 	update_helper_layer_immediately, update_magnified_canvas_size, update_title, view_bitmap, write_image_file
 };
 // Temporary globals until all dependent code is converted to ES Modules
