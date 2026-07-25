@@ -816,6 +816,10 @@ $G.on("vertical-color-box-mode-toggled", () => {
 $G.on("resize", () => { // for browser zoom, and in-app zoom of the canvas
 	update_canvas_rect();
 	update_disable_aa();
+	// How many rows the palette wraps into is set in CSS and can change with the viewport
+	// on a touch device (a phone turned sideways gets two rows instead of three), but the
+	// resulting palette size is measured in JS, so it has to be re-measured.
+	$colorbox.update_palette_wrapping();
 });
 $canvas_area.on("scroll", () => {
 	update_canvas_rect();
