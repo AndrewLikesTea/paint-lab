@@ -435,6 +435,14 @@ interface Window {
 		};
 		set_theme: (theme_file_name: string) => void;
 		$: JQueryStatic;
+		/** Snapshot of the pointer/touch input state; see `canvas-interaction.js` */
+		get_interaction_state: () => {
+			pointer_active: boolean;
+			drawing_pointer_id: number | undefined;
+			tracked_pointer_count: number;
+			canvas_touch_policy: import("./canvas-interaction.js").InteractionState;
+			canvas_area_touch_policy: import("./canvas-interaction.js").InteractionState;
+		};
 	};
 
 	// app-localization.js

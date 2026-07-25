@@ -100,72 +100,10 @@ function default_report_failure(error, details) {
 	console.error("Canvas rendering update failed.", { error, ...details });
 }
 
-/**
- * Owns the bounded touch policy for one drawing surface.
- */
-class CanvasInteractionController {
-	/**
-	 * @param {HTMLElement} target
-	 * @param {(error: Error, details: object) => void} [report_failure]
-	 */
-	constructor(target, report_failure = default_report_failure) {
-		if (!(target instanceof HTMLElement)) {
-			throw new TypeError("CanvasInteractionController target must be an HTMLElement");
-		}
-		this.target = target;
-		this.report_failure = report_failure;
-		this.active_touch_ids = new Set();
-		this.started = false;
-		this.handle_pointer_event = this.handle_pointer_event.bind(this);
-	}
-	start() {
-		if (this.started) {
-			return;
-		}
-		this.started = true;
-		this.target.style.touchAction = "none";
-		this.target.addEventListener("pointerdown", this.handle_pointer_event, { passive: false });
-		this.target.addEventListener("pointermove", this.handle_pointer_event, { passive: false });
-		this.target.addEventListener("pointerup", this.handle_pointer_event, { passive: false });
-		this.target.addEventListener("pointercancel", this.handle_pointer_event, { passive: false });
-	}
-	stop() {
-		if (!this.started) {
-			return;
-		}
-		this.started = false;
-		this.active_touch_ids.clear();
-		this.target.removeEventListener("pointerdown", this.handle_pointer_event);
-		this.target.removeEventListener("pointermove", this.handle_pointer_event);
-		this.target.removeEventListener("pointerup", this.handle_pointer_event);
-		this.target.removeEventListener("pointercancel", this.handle_pointer_event);
-	}
-	/** @param {PointerEvent} event */
-	handle_pointer_event(event) {
-		if (event.pointerType !== "touch") {
-			return;
-		}
-		if (event.type === "pointerdown") {
-			this.active_touch_ids.add(event.pointerId);
-		}
-		if (this.active_touch_ids.has(event.pointerId) && event.cancelable) {
-			event.preventDefault();
-			if (!event.defaultPrevented) {
-				this.report_failure(new Error("Cancelable touch event was not prevented"), {
-					operation: "prevent-touch-default",
-					eventType: event.type,
-					pointerId: event.pointerId,
-				});
-			}
-		}
-		if (event.type === "pointerup" || event.type === "pointercancel") {
-			this.active_touch_ids.delete(event.pointerId);
-		}
-	}
-}
+// The touch policy that used to live here moved to `canvas-interaction.js`, where it grew
+// the state model and failure reporting that a scrolling-while-drawing bug needs.
 
 export {
-	CanvasInteractionController,
 	apply_canvas_sizing,
 	calculate_canvas_sizing
 };

@@ -26,6 +26,8 @@ html, body, .jspaint {
 	-moz-user-select: none;
 	-ms-user-select: none;
 	user-select: none;
+	/* and the callout/magnifier Safari shows for the same long-press, which pops up mid-stroke when drawing slowly */
+	-webkit-touch-callout: none;
 }
 .chooser-option {
 	display: flex;

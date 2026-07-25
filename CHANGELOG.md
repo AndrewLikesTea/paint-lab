@@ -6,7 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No changes here yet.
+### App
+
+#### Fixed
+- Drawing with a finger no longer lets the browser scroll or zoom the page out from under the
+  stroke: the canvas claims every touch on it, and the canvas area claims two-finger gestures
+  (which are the app's own pan and zoom) while still scrolling normally with one finger.
+  Long-pressing while drawing slowly no longer pops up Safari's selection callout.
+- A stroke interrupted by the browser taking the touch away (palm rejection, a system edge
+  swipe) is now rolled back like a two-finger cancel, instead of leaving the app painting
+  wherever a finger moved next — and leaving the Airbrush spraying.
 
 ## [1.1.0] - 2026-04-10
 
