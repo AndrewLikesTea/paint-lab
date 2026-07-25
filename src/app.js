@@ -1,7 +1,7 @@
 // @ts-check
 // eslint-disable-next-line no-unused-vars
 /* global airbrush_size:writable, brush_shape:writable, brush_size:writable, button:writable, ctrl:writable, eraser_size:writable, fill_color:writable, pick_color_slot:writable, history_node_to_cancel_to:writable, MenuBar:writable, my_canvas_height:writable, my_canvas_width:writable, palette:writable, pencil_size:writable, pointer:writable, pointer_active:writable, pointer_buttons:writable, pointer_over_canvas:writable, pointer_previous:writable, pointer_start:writable, pointer_type:writable, pointers:writable, reverse:writable, shift:writable, stroke_color:writable, stroke_size:writable, update_helper_layer_on_pointermove_active:writable */
-/* global AccessKeys, current_history_node, default_airbrush_size, default_brush_shape, default_brush_size, default_canvas_height, default_canvas_width, default_eraser_size, default_magnification, default_pencil_size, default_stroke_size, enable_fs_access_api, file_name, get_direction, localize, magnification, main_canvas, main_ctx, return_to_tools, selected_colors, selected_tool, selected_tools, selection, systemHooks, textbox, transparency */
+/* global AccessKeys, current_history_node, default_airbrush_size, default_brush_shape, default_brush_size, default_eraser_size, default_magnification, default_pencil_size, default_stroke_size, enable_fs_access_api, file_name, get_direction, localize, magnification, main_canvas, main_ctx, return_to_tools, selected_colors, selected_tool, selected_tools, selection, systemHooks, textbox, transparency */
 
 import { $ColorBox } from "./$ColorBox.js";
 import { $ToolBox } from "./$ToolBox.js";
@@ -12,6 +12,7 @@ import { show_edit_colors_window } from "./edit-colors.js";
 import { image_formats } from "./file-format-data.js";
 import { $this_version_news, cancel, change_some_url_params, change_url_param, clear, confirm_overwrite_capability, delete_selection, deselect, edit_copy, edit_cut, edit_paste, file_new, file_open, file_save, file_save_as, get_tool_by_id, get_uris, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, load_image_from_uri, make_or_update_undoable, open_from_file, paste, paste_image_from_file, redo, render_history_as_gif, reset_canvas_and_history, reset_file, reset_selected_colors, resize_canvas_and_save_dimensions, resize_canvas_without_saving_dimensions, save_as_prompt, select_all, select_tool, select_tools, set_magnification, show_document_history, show_error_message, show_news, show_resource_load_error_message, toggle_grid, undo, update_canvas_rect, update_disable_aa, update_helper_layer, update_magnified_canvas_size, view_bitmap, write_image_file } from "./functions.js";
 import { CanvasInteractionController } from "./canvas-interaction.js";
+import { CANVAS_SIZING_SCHEMA_VERSION, DESKTOP_CANVAS_HEIGHT, DESKTOP_CANVAS_WIDTH, decide_initial_canvas_size, measure_available_area, read_device_signals } from "./canvas-sizing.js";
 import { show_help } from "./help.js";
 import { $G, E, TAU, get_file_extension, get_help_folder_icon, is_discord_embed, make_canvas, to_canvas_coords } from "./helpers.js";
 import { init_webgl_stuff, rotate } from "./image-manipulation.js";
@@ -1361,15 +1362,50 @@ reset_selected_colors();
 reset_canvas_and_history(); // (with newly reset colors)
 set_magnification(default_magnification);
 
+/**
+ * How the starting canvas size was chosen, kept for tests and bug reports.
+ * Set once, during startup, and not used for anything afterwards.
+ * @type {import("./canvas-sizing.js").SizingDecision | null}
+ */
+let last_canvas_sizing_decision = null;
+
 // this is synchronous for now, but @TODO: handle possibility of loading a document before callback
 // when switching to asynchronous storage, e.g. with localforage
+//
+// The defaults are null, not 683x384, so that "never saved a size" is
+// distinguishable from "saved a size that happens to be the default".
+// `decide_initial_canvas_size` needs that difference: a saved size is a choice
+// the user made and is never second-guessed, whereas an absent one leaves the
+// size free to adapt to the device. See src/canvas-sizing.js.
 localStore.get({
-	width: default_canvas_width,
-	height: default_canvas_height,
+	width: null,
+	height: null,
 }, (err, stored_values) => {
-	if (err) { return; }
-	my_canvas_width = Number(stored_values.width);
-	my_canvas_height = Number(stored_values.height);
+	try {
+		// An unreadable store isn't fatal here: it just means there's no saved
+		// size, which is the same situation as a first visit.
+		last_canvas_sizing_decision = decide_initial_canvas_size({
+			signals: read_device_signals(),
+			available_area: measure_available_area($canvas_area[0]),
+			stored_dimensions: err ? null : stored_values,
+		});
+	} catch (error) {
+		// Sizing the canvas must never be what stops the app from starting.
+		// Fall back to the size it's opened at for the last decade, and keep the
+		// failure visible in the decision record rather than swallowing it.
+		last_canvas_sizing_decision = {
+			schema_version: CANVAS_SIZING_SCHEMA_VERSION,
+			width: DESKTOP_CANVAS_WIDTH,
+			height: DESKTOP_CANVAS_HEIGHT,
+			source: "desktop-default",
+			device_class: "unknown",
+			scale: 1,
+			reasons: ["sizing-threw"],
+			warnings: [`sizing-threw: ${error}`],
+		};
+	}
+	my_canvas_width = last_canvas_sizing_decision.width;
+	my_canvas_height = last_canvas_sizing_decision.height;
 
 	make_or_update_undoable({
 		match: (history_node) => history_node.name === localize("New"),
@@ -1967,6 +2003,11 @@ window.api_for_cypress_tests = {
 		canvas_touch_policy: canvas_interactions.get_state(),
 		canvas_area_touch_policy: canvas_area_interactions.get_state(),
 	}),
+	/**
+	 * How the starting canvas size was chosen; see `canvas-sizing.js`.
+	 * Null only if startup didn't get as far as deciding.
+	 */
+	get_canvas_sizing_decision: () => last_canvas_sizing_decision,
 };
 // #endregion
 

@@ -444,6 +444,8 @@ interface Window {
 			canvas_touch_policy: import("./canvas-interaction.js").InteractionState;
 			canvas_area_touch_policy: import("./canvas-interaction.js").InteractionState;
 		};
+		/** How the starting canvas size was chosen; see `canvas-sizing.js` */
+		get_canvas_sizing_decision: () => import("./canvas-sizing.js").SizingDecision | null;
 	};
 
 	// app-localization.js
