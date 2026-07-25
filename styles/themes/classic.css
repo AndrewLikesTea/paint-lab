@@ -4,6 +4,11 @@
 
 :root {
 	--theme-loaded: "classic.css";
+
+	/* Hyperlink-style hover color, for history entries, help topics, and disclosure summaries.
+	Themes with a dark --Window/--ButtonFace must override this; classic hyperlink blue only has
+	about 2.4:1 contrast on black. */
+	--link-hover-color: #0000FF;
 }
 
 /* .compare-reference is added to <body> when "compare-reference" is in the URL hash. */
@@ -390,7 +395,7 @@ body,
 }
 .help-window .item:hover {
 	text-decoration: underline;
-	color: #0000FF;
+	color: var(--link-hover-color);
 	cursor: pointer;
 }
 .help-window li:before {
@@ -565,7 +570,7 @@ summary:focus {
 }
 summary:hover > span {
 	text-decoration: underline;
-	color: #0000FF;
+	color: var(--link-hover-color);
 }
 summary::marker {
 	color: var(--ButtonText);

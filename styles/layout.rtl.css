@@ -949,7 +949,7 @@ whereas it breaks component docking calculations if used to shift the colors box
 	color: gray;
 }
 .history-entry:hover:hover:hover { /* specificity hack vs :not()s */
-	color: #0000ff;
+	color: var(--link-hover-color);
 	text-decoration: underline;
 }
 

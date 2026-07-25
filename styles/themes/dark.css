@@ -3,6 +3,16 @@
 
 :root {
 	--theme-loaded: "dark.css";
+
+	/* Keep disabled labels readable against --ButtonFace (#202020). */
+	--GrayText: #9a9a9a;
+
+	/* classic.css defaults this to hyperlink blue, which is only ~2.4:1 on this theme's
+	black --Window. Lightened to a blue that still reads as a link. */
+	--link-hover-color: #5aa9ff;
+
+	/* Styles built-in controls like inputs and scrollbars. */
+	color-scheme: dark;
 }
 
 .tool-icon {
