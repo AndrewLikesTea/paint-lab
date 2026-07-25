@@ -9,8 +9,15 @@
 	--WindowText: #ffffff;
 	--ButtonText: #ffffff;
 
+	/* Inherited from vista-esque-midnight-green.css as rgb(32, 32, 32), which is exactly
+	--ButtonFace, i.e. invisible. No rule in the modern stylesheets reads it today, but it's
+	the same broken value that made disabled text vanish in dark.css. */
+	--GrayText: #9a9a9a;
+
 	--accent-color: #2196f3;
-	--accent-color-hover: #1976D2;
+	/* modern.css hovers toward a *darker* blue, which is backwards on a black background
+	(and only reaches 4.6:1). Material Blue 300, the dark-theme counterpart of Blue 700. */
+	--accent-color-hover: #64b5f6;
 	--window-frame-active-color: #3f51b5;
 	--window-frame-inactive-color: #3b3c42;
 	--help-window-resizer-color: var(--window-frame-inactive-color);
@@ -26,9 +33,22 @@
 	--menu-text-active-color: #eeeeee;
 	--menu-divider-color: rgba(128, 128, 128, 0.3);
 	--selected-tool-color: rgba(128, 128, 128, 0.5);
+	--disclosure-background-color: #2c2c2c;
+	--disclosure-border-color: #666666;
 
 	/* Styles built-in controls like buttons. */
 	color-scheme: dark;
+}
+
+details {
+	border-color: var(--disclosure-border-color);
+}
+summary {
+	background-color: var(--disclosure-background-color);
+	color: var(--window-text-color);
+}
+details[open] > summary {
+	border-bottom-color: var(--disclosure-border-color);
 }
 
 .tool-icon {
