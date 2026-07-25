@@ -1,30 +1,43 @@
 // @ts-check
 // eslint-disable-next-line no-unused-vars
 /* global file_name:writable */
-/* global $app, $canvas_area, localize, magnification, main_canvas, main_ctx, redos, undos */
+/* global $app, $canvas_area, $status_text, localize, magnification, main_canvas, main_ctx, redos, undos */
 import { $DialogWindow } from "./$ToolWindow.js";
 // import { localize } from "./app-localization.js";
 import { change_url_param, get_uris, load_image_from_uri, open_from_image_info, redo, reset_file, show_error_message, show_resource_load_error_message, undo, undoable, update_title } from "./functions.js";
 import { $G, debounce, get_help_folder_icon, image_data_match, is_discord_embed, make_canvas, to_canvas_coords } from "./helpers.js";
 import { storage_quota_exceeded } from "./manage-storage.js";
 import { showMessageBox } from "./msgbox.js";
-import { localStore } from "./storage.js";
+import { AUTOSAVE, describe_storage_failure, is_storage_available, read_session, session_key, STORAGE_DISABLED_MESSAGE, write_session } from "./session-storage.js";
 
 const log = (...args) => {
 	window.console?.log(...args);
 };
 
-let localStorageAvailable = false;
-try {
-	localStorage._available = true;
-	localStorageAvailable = localStorage._available;
-	delete localStorage._available;
-} catch (_error) { /* ignore */ }
-
 // @TODO: keep other data in addition to the image data
 // such as the file_name and other state
 // (maybe even whether it's considered saved? idk about that)
 // I could have the image in one storage slot and the state in another
+
+/**
+ * Autosave failures used to be silent unless the browser said "out of space", which meant "my work
+ * is backed up" could quietly stop being true. Say so in the status bar instead — once per distinct
+ * problem, since a dialog every hundred milliseconds while you're drawing would be worse than the
+ * silence it replaced.
+ * @type {string | null}
+ */
+let reported_autosave_failure = null;
+/**
+ * @param {import("./session-storage.js").StorageResult} storage_failure
+ */
+function report_autosave_failure(storage_failure) {
+	window.console?.warn(`Autosave failed (${storage_failure.reason}):`, storage_failure.error);
+	if (reported_autosave_failure === storage_failure.reason) {
+		return;
+	}
+	reported_autosave_failure = storage_failure.reason;
+	$status_text.text(describe_storage_failure(storage_failure));
+}
 
 const match_threshold = 1; // 1 is just enough for a workaround for Brave browser's farbling: https://github.com/1j01/jspaint/issues/184
 const canvas_has_any_apparent_image_data = () =>
@@ -112,50 +125,51 @@ function handle_data_loss() {
 class LocalSession {
 	constructor(session_id) {
 		this.id = session_id;
-		const ls_key = `image#${session_id}`;
-		log(`Local storage key: ${ls_key}`);
+		log(`Local storage key: ${session_key(AUTOSAVE, session_id)}`);
 		// save image to storage
 		this.save_image_to_storage_immediately = () => {
 			const save_paused = handle_data_loss();
 			if (save_paused) {
 				return;
 			}
-			log(`Saving image to storage: ${ls_key}`);
-			localStore.set(ls_key, main_canvas.toDataURL("image/png"), (err) => {
-				if (err) {
-					// @ts-ignore (quotaExceeded is added by storage.js)
-					if (err.quotaExceeded) {
-						storage_quota_exceeded();
-					} else {
-						// e.g. localStorage is disabled
-						// (or there's some other error?)
-						// @TODO: show warning with "Don't tell me again" type option
-					}
-				}
+			log(`Saving image to storage: ${session_key(AUTOSAVE, session_id)}`);
+			const result = write_session({
+				kind: AUTOSAVE,
+				id: session_id,
+				data_url: main_canvas.toDataURL("image/png"),
+				width: main_canvas.width,
+				height: main_canvas.height,
+			}, {
+				// Skip the read-back: this runs up to ten times a second on data URLs that can be
+				// megabytes, and localStorage keeps the previous value when a write fails anyway.
+				verify: false,
 			});
+			if (result.ok) {
+				reported_autosave_failure = null;
+			} else if (result.reason === "quota") {
+				storage_quota_exceeded();
+			} else {
+				report_autosave_failure(result);
+			}
 		};
 		this.save_image_to_storage_soon = debounce(this.save_image_to_storage_immediately, 100);
-		localStore.get(ls_key, (err, uri) => {
-			if (err) {
-				if (localStorageAvailable) {
-					show_error_message("Failed to retrieve image from local storage.", err);
-				} else {
-					// @TODO: DRY with storage manager message
-					showMessageBox({
-						message: "Please enable local storage in your browser's settings for local backup. It may be called Cookies, Storage, or Site Data.",
-					});
-				}
-			} else if (uri) {
-				load_image_from_uri(uri).then((info) => {
-					open_from_image_info(info, null, null, true, true);
-				}, (error) => {
-					show_error_message("Failed to open image from local storage.", error);
-				});
+		const read = read_session(AUTOSAVE, session_id);
+		if (!read.ok) {
+			if (is_storage_available()) {
+				show_error_message("Failed to retrieve image from local storage.", read.error);
 			} else {
-				// no uri so lets save the blank canvas
-				this.save_image_to_storage_soon();
+				showMessageBox({ message: localize(STORAGE_DISABLED_MESSAGE) });
 			}
-		});
+		} else if (read.record) {
+			load_image_from_uri(read.record.data_url).then((info) => {
+				open_from_image_info(info, null, null, true, true);
+			}, (error) => {
+				show_error_message("Failed to open image from local storage.", error);
+			});
+		} else {
+			// nothing saved yet, so lets save the blank canvas
+			this.save_image_to_storage_soon();
+		}
 		$G.on("session-update.session-hook", () => {
 			this.save_image_to_storage_soon();
 		});
