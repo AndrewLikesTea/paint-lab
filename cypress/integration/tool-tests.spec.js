@@ -153,6 +153,35 @@ context("tool tests", () => {
 		});
 	});
 
+	it("adjusts brush size with Ctrl+/ and Ctrl/- and updates the options UI", () => {
+		cy.get(".tool[title='Brush']").click();
+		cy.window().then((win) => {
+			const $brushOptions = win.$(".choose-brush .chooser-option");
+			const $selectedOption = $brushOptions.filter((_, option) =>
+				win.$(option).css("background-color") !== "rgba(0, 0, 0, 0)"
+			);
+			expect($selectedOption).to.have.length(1);
+
+			const increaseEvent = new win.$.Event("keydown", {
+				key: "/",
+				ctrlKey: true,
+			});
+			win.$("body").trigger(increaseEvent);
+			expect(increaseEvent.isDefaultPrevented()).to.equal(true);
+			expect($brushOptions.filter((_, option) =>
+				win.$(option).css("background-color") !== "rgba(0, 0, 0, 0)"
+			)).to.have.length(0);
+
+			const decreaseEvent = new win.$.Event("keydown", {
+				key: "-",
+				ctrlKey: true,
+			});
+			win.$("body").trigger(decreaseEvent);
+			expect(decreaseEvent.isDefaultPrevented()).to.equal(true);
+			expect($selectedOption.css("background-color")).not.to.equal("rgba(0, 0, 0, 0)");
+		});
+	});
+
 	// it("brush tool", () => {
 	// 	cy.get(".tool[title='Brush']").click();
 	// 	// gesture([{ x: 50, y: 50 }, { x: 100, y: 100 }]);

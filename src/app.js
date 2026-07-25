@@ -1015,9 +1015,11 @@ $G.on("keydown", (e) => {
 		// normal + and - keys
 		e.key === "+" ||
 		e.key === "-" ||
-		e.key === "="
+		e.key === "=" ||
+		// Ctrl+/ is an explicit size-increase shortcut.
+		(e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === "/")
 	) {
-		const plus = e.code === "NumpadAdd" || e.key === "+" || e.key === "=";
+		const plus = e.code === "NumpadAdd" || e.key === "+" || e.key === "=" || e.key === "/";
 		const minus = e.code === "NumpadSubtract" || e.key === "-";
 		const delta = Number(plus) - Number(minus); // const delta = +plus++ -minus--; // Δ = ±±±±
 
