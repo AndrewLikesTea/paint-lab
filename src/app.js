@@ -10,7 +10,7 @@ import { Handles } from "./Handles.js";
 import { default_palette, get_winter_palette } from "./color-data.js";
 import { show_edit_colors_window } from "./edit-colors.js";
 import { image_formats } from "./file-format-data.js";
-import { $this_version_news, cancel, change_some_url_params, change_url_param, clear, confirm_overwrite_capability, delete_selection, deselect, edit_copy, edit_cut, edit_paste, file_new, file_open, file_save, file_save_as, get_tool_by_id, get_uris, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, load_image_from_uri, make_or_update_undoable, open_from_file, paste, paste_image_from_file, redo, render_history_as_gif, reset_canvas_and_history, reset_file, reset_selected_colors, resize_canvas_and_save_dimensions, resize_canvas_without_saving_dimensions, save_as_prompt, select_all, select_tool, select_tools, set_magnification, show_document_history, show_error_message, show_news, show_resource_load_error_message, toggle_grid, undo, update_canvas_rect, update_disable_aa, update_helper_layer, update_magnified_canvas_size, view_bitmap, write_image_file } from "./functions.js";
+import { $this_version_news, cancel, change_some_url_params, change_url_param, clear, confirm_overwrite_capability, delete_selection, deselect, edit_copy, edit_cut, edit_paste, file_new, file_open, file_save, file_save_as, get_tool_by_id, get_uris, image_attributes, image_flip_and_rotate, image_invert_colors, image_stretch_and_skew, load_image_from_uri, make_or_update_undoable, open_from_file, paste, paste_image_from_file, redo, render_history_as_gif, reset_canvas_and_history, reset_file, reset_selected_colors, resize_canvas_and_save_dimensions, resize_canvas_without_saving_dimensions, save_as_prompt, select_all, select_tool, select_tools, set_magnification, share_current_image, show_document_history, show_error_message, show_news, show_resource_load_error_message, toggle_grid, undo, update_canvas_rect, update_disable_aa, update_helper_layer, update_magnified_canvas_size, view_bitmap, write_image_file } from "./functions.js";
 import { CanvasInteractionController } from "./canvas-interaction.js";
 import { CANVAS_SIZING_SCHEMA_VERSION, DESKTOP_CANVAS_HEIGHT, DESKTOP_CANVAS_WIDTH, decide_initial_canvas_size, measure_available_area, read_device_signals } from "./canvas-sizing.js";
 import { show_help } from "./help.js";
@@ -542,6 +542,45 @@ if (get_direction() === "rtl") {
 // #region Status Bar
 const $status_area = $(E("div")).addClass("status-area").appendTo($V);
 window.$status_area = $status_area;
+const $mobile_share_button = $(E("button"))
+	.addClass("mobile-share-button")
+	.attr({
+		type: "button",
+		"aria-label": localize("Share drawing"),
+		"aria-describedby": "mobile-share-status",
+	})
+	.text(localize("Share"))
+	.appendTo($status_area);
+const $mobile_share_status = $(E("span"))
+	.addClass("mobile-share-status")
+	.attr({
+		id: "mobile-share-status",
+		role: "status",
+		"aria-live": "polite",
+	})
+	.appendTo($status_area);
+$mobile_share_button.on("click", async () => {
+	if ($mobile_share_button.prop("disabled")) {
+		return;
+	}
+	$mobile_share_button.prop("disabled", true);
+	$mobile_share_status.text(localize("Sharing…"));
+	try {
+		const result = await share_current_image((message, error) => window.console?.warn(message, error));
+		const result_messages = {
+			shared: localize("Shared"),
+			copied: localize("Copied"),
+			downloaded: localize("Downloaded"),
+			cancelled: "",
+		};
+		$mobile_share_status.text(result_messages[result]);
+	} catch (_error) {
+		$mobile_share_status.text(localize("Share failed"));
+		show_error_message(localize("Failed to share the image."));
+	} finally {
+		$mobile_share_button.prop("disabled", false);
+	}
+});
 const $status_text = /** @type {JQuery<HTMLDivElement> & {default: ()=> void}} */($(E("div")).addClass("status-text status-field inset-shallow").appendTo($status_area));
 window.$status_text = $status_text;
 const $status_position = $(E("div")).addClass("status-coordinates status-field inset-shallow").appendTo($status_area);
