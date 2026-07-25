@@ -6,112 +6,14 @@ import { $DialogWindow } from "./$ToolWindow.js";
 // import { localize } from "./app-localization.js";
 import { deselect, handle_keyshortcuts, load_image_from_uri, open_from_image_info, show_error_message, update_title } from "./functions.js";
 import { E, render_access_key } from "./helpers.js";
+import { delete_session, describe_storage_failure, find_session_by_name, list_sessions, MANUAL, new_session_id, restore_session, write_session } from "./session-storage.js";
 
-// Drawings saved with File > Save to Browser live in localStorage, alongside (but separate from)
-// the per-session autosave backups written by sessions.js, which use the "image#" prefix
-// and are listed by File > Manage Storage. These are explicit, user-named saves, so they get
-// their own prefix, their own metadata, and are never written or removed automatically.
-const STORAGE_KEY_PREFIX = "saved-drawing#";
+// Drawings saved with File > Save to Browser share the storage of session-storage.js with the
+// per-session autosave backups that File > Manage Storage lists: same key structure, same record
+// shape, same API. The only difference is the kind — these are explicit, user-named saves, and
+// nothing writes or removes them automatically.
 
-/**
- * @typedef {object} SavedDrawing
- * @property {string} storage_key - the localStorage key the drawing is stored under
- * @property {string} name - the name the user gave the drawing
- * @property {string} data_url - a PNG data URL of the canvas
- * @property {number} width - canvas width in pixels, for display (0 if unknown)
- * @property {number} height - canvas height in pixels, for display (0 if unknown)
- * @property {number} saved_at - Unix timestamp in milliseconds (0 if unknown)
- */
-
-/**
- * localStorage, or null if the browser won't let us use it.
- * Reading is enough to tell whether storage is blocked entirely (cookies disabled, some private
- * browsing modes); a storage area that's merely *full* still reads fine, and failing writes are
- * handled separately, since that's a recoverable situation with a different remedy.
- * @returns {Storage | null}
- */
-function get_local_storage() {
-	try {
-		const storage = window.localStorage;
-		// Chrome throws on the property access above; Firefox throws here instead.
-		storage.getItem(`${STORAGE_KEY_PREFIX}availability-test`);
-		return storage;
-	} catch (_error) {
-		return null;
-	}
-}
-
-/**
- * @param {string} storage_key
- * @param {string | null} json
- * @returns {SavedDrawing | null} null if the entry isn't a usable saved drawing
- */
-function parse_saved_drawing(storage_key, json) {
-	if (!json) {
-		return null;
-	}
-	let parsed;
-	try {
-		parsed = JSON.parse(json);
-	} catch (_error) {
-		return null; // corrupted, or written by something else using the same prefix
-	}
-	if (
-		!parsed ||
-		typeof parsed.name !== "string" ||
-		typeof parsed.data_url !== "string" ||
-		!parsed.data_url.startsWith("data:image/")
-	) {
-		return null;
-	}
-	return {
-		storage_key,
-		name: parsed.name,
-		data_url: parsed.data_url,
-		width: Number(parsed.width) || 0,
-		height: Number(parsed.height) || 0,
-		saved_at: Number(parsed.saved_at) || 0,
-	};
-}
-
-/**
- * @returns {SavedDrawing[] | null} null if local storage is unavailable; newest first
- */
-function list_saved_drawings() {
-	const storage = get_local_storage();
-	if (!storage) {
-		return null;
-	}
-	const drawings = [];
-	for (let index = 0; index < storage.length; index += 1) {
-		const storage_key = storage.key(index);
-		if (!storage_key || storage_key.indexOf(STORAGE_KEY_PREFIX) !== 0) {
-			continue;
-		}
-		// Skip unreadable entries rather than failing the whole list;
-		// one bad entry shouldn't hide the user's other drawings.
-		const drawing = parse_saved_drawing(storage_key, storage.getItem(storage_key));
-		if (drawing) {
-			drawings.push(drawing);
-		}
-	}
-	drawings.sort((a, b) => b.saved_at - a.saved_at);
-	return drawings;
-}
-
-/**
- * @param {Error & {code?: number, number?: number}} error
- * @returns {boolean}
- */
-function is_quota_exceeded(error) {
-	// Same detection as storage.js, plus the modern name.
-	return (
-		error.name === "QuotaExceededError" ||
-		error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
-		error.code === 22 ||
-		error.number === -2147024882
-	);
-}
+/** @typedef {import("./session-storage.js").SessionRecord} SessionRecord */
 
 // A polite live region, so saving and deleting are announced to screen reader users;
 // these actions otherwise only change things visually (or close the dialog outright).
@@ -175,10 +77,10 @@ function show_save_to_browser_dialog() {
 	// Default to the document name without its file extension, the way Save As does.
 	$input.val(String(file_name ?? "").replace(/\.[^.]*$/, "") || localize("untitled"));
 
-	// The storage key the next Save will overwrite, once the user has been told
-	// that the name is taken. Confirming inline keeps everything in one window;
-	// a second window stacked on this one can end up behind it.
-	let replacing_storage_key = null;
+	// The ID the next Save will overwrite, once the user has been told that the name is taken.
+	// Confirming inline keeps everything in one window; a second window stacked on this one
+	// can end up behind it.
+	let replacing_id = null;
 
 	/**
 	 * @param {string} message
@@ -190,8 +92,8 @@ function show_save_to_browser_dialog() {
 	};
 
 	const clear_pending_replace = () => {
-		if (replacing_storage_key) {
-			replacing_storage_key = null;
+		if (replacing_id) {
+			replacing_id = null;
 			$save.text(localize("Save"));
 			$message.text("");
 		}
@@ -199,9 +101,9 @@ function show_save_to_browser_dialog() {
 
 	/**
 	 * @param {string} name
-	 * @param {string} storage_key
+	 * @param {string} id
 	 */
-	const save = (name, storage_key) => {
+	const save = (name, id) => {
 		// Include the selection, like Save and Export PNG do.
 		deselect();
 		let data_url;
@@ -212,25 +114,23 @@ function show_save_to_browser_dialog() {
 			show_error_message(localize("Failed to save document."), error);
 			return;
 		}
-		const storage = get_local_storage();
-		if (!storage) {
-			show_field_error(localize("Please enable local storage in your browser's settings for local backup. It may be called Cookies, Storage, or Site Data."));
-			return;
-		}
-		try {
-			storage.setItem(storage_key, JSON.stringify({
-				name,
-				data_url,
-				width: main_canvas.width,
-				height: main_canvas.height,
-				saved_at: Date.now(),
-			}));
-		} catch (error) {
-			if (is_quota_exceeded(error)) {
-				show_field_error(localize("There's not enough space in this browser. Delete drawings you no longer need with File > Open from Browser, or save to your computer with File > Save."));
+		// Either the drawing is stored complete under this ID, or whatever was there is untouched;
+		// a Replace that runs out of space can't leave you with neither.
+		const result = write_session({
+			kind: MANUAL,
+			id,
+			name,
+			data_url,
+			width: main_canvas.width,
+			height: main_canvas.height,
+		});
+		if (!result.ok) {
+			if (result.reason === "unavailable" || result.reason === "quota") {
+				// Both are things the user can act on without losing what they typed.
+				show_field_error(describe_storage_failure(result));
 			} else {
 				$w.close();
-				show_error_message(localize("Failed to save document."), error);
+				show_error_message(localize("Failed to save document."), result.error);
 			}
 			return;
 		}
@@ -253,22 +153,24 @@ function show_save_to_browser_dialog() {
 			show_field_error(localize("Please enter a name for the drawing."));
 			return;
 		}
-		const drawings = list_saved_drawings();
-		if (!drawings) {
-			show_field_error(localize("Please enable local storage in your browser's settings for local backup. It may be called Cookies, Storage, or Site Data."));
+		// Names are the user's handle on a drawing, so one name means one record: saving over a
+		// name reuses its ID rather than adding a second entry you'd have no way to tell apart.
+		const lookup = find_session_by_name(MANUAL, name);
+		if (!lookup.ok) {
+			show_field_error(describe_storage_failure(lookup));
 			return;
 		}
-		const existing = drawings.find((drawing) => drawing.name.toLowerCase() === name.toLowerCase());
-		if (existing && replacing_storage_key !== existing.storage_key) {
+		const existing = lookup.record;
+		if (existing && replacing_id !== existing.id) {
 			// Ask first, by turning Save into Replace; the alert is announced, and pressing
 			// Enter again (or clicking Replace) goes through with it.
-			replacing_storage_key = existing.storage_key;
+			replacing_id = existing.id;
 			$save.text(localize("Replace"));
 			$message.text(localize("%1 already exists in this browser. Choose Replace to overwrite it, or type a different name.", `"${existing.name}"`));
 			$save.focus();
 			return;
 		}
-		save(name, existing?.storage_key ?? `${STORAGE_KEY_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
+		save(name, existing?.id ?? new_session_id());
 	}, { type: "submit" });
 
 	// Editing the name is a change of mind; go back to a plain Save.
@@ -309,11 +211,11 @@ function show_open_from_browser_dialog() {
 		$w.close();
 	});
 
-	const drawings = list_saved_drawings();
+	const listing = list_sessions(MANUAL);
 
 	/**
 	 * One row of the list, for one saved drawing.
-	 * @param {SavedDrawing} drawing
+	 * @param {SessionRecord} drawing
 	 * @returns {JQuery<HTMLLIElement>}
 	 */
 	const make_row = (drawing) => {
@@ -364,19 +266,12 @@ function show_open_from_browser_dialog() {
 		// so keyboard focus stays put, and there's no second window to stack on this one.
 		let deleted = false;
 		/** Exactly what was stored, so Undo restores it byte for byte. */
-		let stored_json = null;
+		let snapshot = null;
 		$delete.on("click", () => {
-			const storage = get_local_storage();
-			if (!storage) {
-				// Storage went away since the list was read (it was readable then, or there'd be no rows).
-				show_error_message(localize("Failed to delete %1.", `"${drawing.name}"`));
-				return;
-			}
 			if (deleted) {
-				try {
-					storage.setItem(drawing.storage_key, stored_json);
-				} catch (error) {
-					show_error_message(localize("Failed to restore %1.", `"${drawing.name}"`), error);
+				const restored = restore_session(snapshot);
+				if (!restored.ok) {
+					show_error_message(localize("Failed to restore %1.", `"${drawing.name}"`), restored.error);
 					return;
 				}
 				deleted = false;
@@ -388,13 +283,12 @@ function show_open_from_browser_dialog() {
 				announce(localize("Restored %1.", `"${drawing.name}"`));
 				return;
 			}
-			stored_json = storage.getItem(drawing.storage_key);
-			try {
-				storage.removeItem(drawing.storage_key);
-			} catch (error) {
-				show_error_message(localize("Failed to delete %1.", `"${drawing.name}"`), error);
+			const removed = delete_session(MANUAL, drawing.id);
+			if (!removed.ok) {
+				show_error_message(localize("Failed to delete %1.", `"${drawing.name}"`), removed.error);
 				return;
 			}
+			snapshot = removed.snapshot;
 			deleted = true;
 			$row.addClass("deleted");
 			$name.text(localize("Deleted %1.", `"${drawing.name}"`));
@@ -408,14 +302,14 @@ function show_open_from_browser_dialog() {
 		return $row;
 	};
 
-	if (!drawings) {
+	if (!listing.ok) {
 		$list.remove();
-		$message.text(localize("Please enable local storage in your browser's settings for local backup. It may be called Cookies, Storage, or Site Data."));
-	} else if (drawings.length === 0) {
+		$message.text(describe_storage_failure(listing));
+	} else if (listing.records.length === 0) {
 		$list.remove();
 		$message.text(localize("No drawings are saved in this browser yet. Use File > Save to Browser to save one."));
 	} else {
-		for (const drawing of drawings) {
+		for (const drawing of listing.records) {
 			$list.append(make_row(drawing));
 		}
 		$message.text(localize("Drawings saved in this browser, on this device."));

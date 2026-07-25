@@ -1,9 +1,14 @@
 /// <reference types="Cypress" />
 
-// Drawings saved with File > Save to Browser live in localStorage under the "saved-drawing#" prefix,
-// separate from the "image#" session autosaves that File > Manage Storage lists.
+// Everything the app saves for you lives under one prefix, in one record shape: the drawings you
+// name with File > Save to Browser are "manual", and the automatic per-session backups that
+// File > Manage Storage lists are "autosave". See src/session-storage.js.
 context("saving drawings in the browser", () => {
-	const STORAGE_KEY_PREFIX = "saved-drawing#";
+	const STORAGE_KEY_PREFIX = "paint-session#manual:";
+	const AUTOSAVE_KEY_PREFIX = "paint-session#autosave:";
+	// What the two paths wrote before they were unified, still out there in people's browsers.
+	const LEGACY_MANUAL_PREFIX = "saved-drawing#";
+	const LEGACY_AUTOSAVE_PREFIX = "image#";
 
 	// Menus need pointer events currently, so this doesn't trigger click events.
 	const clickMenuItem = (selector, label) => {
@@ -44,6 +49,9 @@ context("saving drawings in the browser", () => {
 
 	const seedSavedDrawing = (win, { name, data_url, saved_at = 1700000000000 }) => {
 		win.localStorage.setItem(`${STORAGE_KEY_PREFIX}${name}`, JSON.stringify({
+			format: 1,
+			kind: "manual",
+			id: name,
 			name,
 			data_url: data_url ?? makeTestImageDataURL(win),
 			width: 3,
@@ -102,8 +110,9 @@ context("saving drawings in the browser", () => {
 			.find(".open-button").click();
 		cy.get(".open-from-browser-window").should("not.exist");
 
-		cy.window().then((win) => {
-			const canvas = win.document.querySelector(".main-canvas");
+		// The dialog closes before the image finishes decoding, so this has to be able to retry.
+		cy.get(".main-canvas").should(($canvas) => {
+			const canvas = $canvas[0];
 			expect(canvas.width).to.equal(3);
 			expect(canvas.height).to.equal(2);
 			const { data } = canvas.getContext("2d").getImageData(0, 0, 3, 2);
@@ -249,5 +258,125 @@ context("saving drawings in the browser", () => {
 			.should("have.attr", "alt", ""); // decorative; the name is right beside it
 		cy.get(".open-from-browser-window .open-button").first().type("{esc}");
 		cy.get(".open-from-browser-window").should("not.exist");
+	});
+
+	it("stores automatic and explicit saves under one key structure", () => {
+		cy.window().then((win) => {
+			const canvas = win.document.querySelector(".main-canvas");
+			const ctx = canvas.getContext("2d");
+			ctx.fillStyle = "#ff00ff";
+			ctx.fillRect(0, 0, 20, 10);
+		});
+
+		openMenuItem("Save to Browser");
+		cy.get("#saved-drawing-name").clear().type("Both Paths");
+		cy.contains(".save-to-browser-window button", /^Save$/).click();
+		cy.get(".save-to-browser-window").should("not.exist");
+
+		cy.window().then((win) => {
+			const keys = [];
+			for (let index = 0; index < win.localStorage.length; index += 1) {
+				keys.push(win.localStorage.key(index));
+			}
+			expect(keys.filter((key) => key.indexOf(AUTOSAVE_KEY_PREFIX) === 0), "autosave").to.have.length(1);
+			expect(keys.filter((key) => key.indexOf(STORAGE_KEY_PREFIX) === 0), "explicit save").to.have.length(1);
+			// Same envelope whichever path wrote it, so one reader can handle both.
+			for (const key of keys.filter((key) => key.indexOf("paint-session#") === 0)) {
+				const record = JSON.parse(win.localStorage.getItem(key));
+				expect(record, key).to.include.keys("format", "kind", "id", "name", "data_url", "width", "height", "saved_at");
+				expect(key).to.equal(`paint-session#${record.kind}:${record.id}`);
+			}
+			// Nothing left under the pre-unification prefixes.
+			expect(keys.filter((key) => key.indexOf(LEGACY_MANUAL_PREFIX) === 0)).to.have.length(0);
+			expect(keys.filter((key) => key.indexOf(LEGACY_AUTOSAVE_PREFIX) === 0)).to.have.length(0);
+		});
+	});
+
+	it("migrates drawings saved before the storage paths were unified", () => {
+		// Explicitly index.html, not "/": beforeEach already left us on a "/#local:..." URL, and a
+		// visit that differs only by hash wouldn't reload the page (or run onBeforeLoad).
+		cy.visit("/index.html", {
+			onBeforeLoad(win) {
+				// Exactly what the old File > Save to Browser wrote.
+				win.localStorage.setItem(`${LEGACY_MANUAL_PREFIX}old-one`, JSON.stringify({
+					name: "Old One",
+					data_url: makeTestImageDataURL(win),
+					width: 3,
+					height: 2,
+					saved_at: 1600000000000,
+				}));
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+
+		cy.window().then((win) => {
+			expect(win.localStorage.getItem(`${LEGACY_MANUAL_PREFIX}old-one`), "old entry removed").to.equal(null);
+			const record = JSON.parse(win.localStorage.getItem(`${STORAGE_KEY_PREFIX}old-one`));
+			expect(record.kind).to.equal("manual");
+			expect(record.name).to.equal("Old One");
+			expect(record.saved_at, "keeps when it was saved").to.equal(1600000000000);
+		});
+
+		// And it's still one drawing, not two.
+		openMenuItem("Open from Browser");
+		cy.get(".open-from-browser-window .saved-drawing").should("have.length", 1);
+		cy.contains(".open-from-browser-window .saved-drawing", "Old One").should("exist");
+	});
+
+	it("recovers an autosave written before the storage paths were unified", () => {
+		cy.visit("/index.html#local:legacy-session", {
+			onBeforeLoad(win) {
+				// The old autosave format: just the data URL, JSON-encoded, under "image#<session ID>".
+				win.localStorage.setItem(`${LEGACY_AUTOSAVE_PREFIX}legacy-session`, JSON.stringify(makeTestImageDataURL(win)));
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+
+		// The backup is still restored onto the canvas, which is the whole point of having it.
+		cy.get(".main-canvas").should(($canvas) => {
+			expect($canvas[0].width).to.equal(3);
+			expect($canvas[0].height).to.equal(2);
+			const { data } = $canvas[0].getContext("2d").getImageData(0, 0, 3, 2);
+			expect([data[0], data[1], data[2], data[3]], "top-left pixel is red").to.deep.equal([255, 0, 0, 255]);
+		});
+
+		cy.window().then((win) => {
+			expect(win.localStorage.getItem(`${LEGACY_AUTOSAVE_PREFIX}legacy-session`), "old entry removed").to.equal(null);
+			const record = JSON.parse(win.localStorage.getItem(`${AUTOSAVE_KEY_PREFIX}legacy-session`));
+			expect(record.kind).to.equal("autosave");
+			expect(record.id, "the ID is the session ID, so the backup links back to its session").to.equal("legacy-session");
+			expect(record.data_url).to.match(/^data:image\/png/);
+		});
+
+		// Manage Storage lists it, still linking to the session it belongs to.
+		// (There's a second row for the session beforeEach started; this test is about this one.)
+		openMenuItem("Manage Storage");
+		cy.get(".storage-manager a[href='#local:legacy-session']").should("exist");
+	});
+
+	it("keeps a recoverable legacy save when its unified key is corrupt", () => {
+		cy.visit("/index.html", {
+			onBeforeLoad(win) {
+				win.localStorage.setItem(`${LEGACY_MANUAL_PREFIX}recoverable`, JSON.stringify({
+					name: "Recoverable",
+					data_url: makeTestImageDataURL(win),
+					width: 3,
+					height: 2,
+					saved_at: 1600000000000,
+				}));
+				win.localStorage.setItem(`${STORAGE_KEY_PREFIX}recoverable`, "{not valid json");
+			},
+		});
+		cy.window().should("have.property", "api_for_cypress_tests");
+
+		cy.window().then((win) => {
+			expect(
+				win.localStorage.getItem(`${LEGACY_MANUAL_PREFIX}recoverable`),
+				"last readable copy is retained"
+			).not.to.equal(null);
+		});
+
+		openMenuItem("Open from Browser");
+		cy.contains(".open-from-browser-window .saved-drawing", "Recoverable").should("exist");
 	});
 });

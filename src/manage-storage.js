@@ -4,6 +4,7 @@ import { $DialogWindow } from "./$ToolWindow.js";
 // import { localize } from "./app-localization.js";
 import { E, is_discord_embed } from "./helpers.js";
 import { showMessageBox } from "./msgbox.js";
+import { AUTOSAVE, delete_session, describe_storage_failure, list_sessions } from "./session-storage.js";
 
 /** @type {OSGUI$Window & I$DialogWindow} */
 let $storage_manager;
@@ -56,12 +57,16 @@ function manage_storage() {
 		$storage_manager.close();
 	});
 
-	const addRow = (k, imgSrc) => {
+	/**
+	 * @param {import("./session-storage.js").SessionRecord} record
+	 */
+	const addRow = (record) => {
 		const $tr = $(E("tr")).appendTo($table);
 
-		const $img = $(E("img")).attr({ src: imgSrc }).addClass("thumbnail-img");
+		const $img = $(E("img")).attr({ src: record.data_url }).addClass("thumbnail-img");
 		const $remove = $(E("button")).text("Remove").addClass("remove-button").attr("type", "button");
-		const href = `#${k.replace("image#", "local:")}`;
+		// An autosave's ID *is* its session ID, so the backup links back to the session it belongs to.
+		const href = `#local:${record.id}`;
 		// The Electron app is a single window for now. This isn't a great experience, but it's better than a broken link.
 		// The Discord Activity can open a external links (with a prompt), but opening internally seems better,
 		// and it was opening a new tab with the app but not loading the document, so this fixes that.
@@ -81,7 +86,15 @@ function manage_storage() {
 			$tr.prev().find(".remove-button").focus();
 			$tr.next().find(".remove-button").focus();
 
-			localStorage.removeItem(k);
+			const result = delete_session(AUTOSAVE, record.id);
+			if (!result.ok) {
+				showMessageBox({
+					title: "Storage Error",
+					message: describe_storage_failure(result),
+					iconID: "warning",
+				});
+				return;
+			}
 			$tr.remove();
 			if ($table.find("tr").length == 0) {
 				$message.html("<p>All clear!</p>");
@@ -89,38 +102,19 @@ function manage_storage() {
 		});
 	};
 
-	let localStorageAvailable = false;
-	try {
-		if (localStorage.length > 0) {
-			// This is needed in case it's COMPLETELY full.
-			// Test with https://stackoverflow.com/questions/45760110/how-to-fill-javascript-localstorage-to-its-max-capacity-quickly
-			// Of course, this dialog only manages images, not other data (for now anyway).
-			localStorageAvailable = true;
-		} else {
-			localStorage._available = true;
-			localStorageAvailable = localStorage._available;
-			delete localStorage._available;
-		}
-	} catch (_error) { /* ignore */ }
+	// Listing reads rather than writes, so it still works when storage is completely full.
+	// Test with https://stackoverflow.com/questions/45760110/how-to-fill-javascript-localstorage-to-its-max-capacity-quickly
+	const listing = list_sessions(AUTOSAVE);
 
-	if (localStorageAvailable) {
-		for (const k in localStorage) {
-			if (k.match(/^image#/)) {
-				let v = localStorage[k];
-				try {
-					if (v[0] === '"') {
-						v = JSON.parse(v);
-					}
-				} catch (_error) { /* ignore */ }
-				addRow(k, v);
-			}
+	if (listing.ok) {
+		for (const record of listing.records) {
+			addRow(record);
 		}
 	}
 
-	if (!localStorageAvailable) {
-		// @TODO: DRY with similar message
+	if (!listing.ok) {
 		// @TODO: instructions for your browser; it's called Cookies in chrome/chromium at least, and "storage" gives NO results
-		$message.html("<p>Please enable local storage in your browser's settings for local backup. It may be called Cookies, Storage, or Site Data.</p>");
+		$message.text(describe_storage_failure(listing));
 	} else if ($table.find("tr").length == 0) {
 		$message.html("<p>All clear!</p>");
 	}
