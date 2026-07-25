@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### App
 
+#### Changed
+- New documents on phones and small tablets now open at a canvas that fits the screen, instead of
+  the 683x384 default, which was wider than the display and left you scrolled into the corner of a
+  picture you couldn't see. The canvas keeps the default's proportions, and won't shrink below
+  160x90. Desktops are unaffected, including in a small window, and a canvas size you've set
+  yourself (by dragging the canvas handles or through **Image > Attributes**) is always used as-is,
+  on every device.
+
 #### Fixed
 - Drawing with a finger no longer lets the browser scroll or zoom the page out from under the
   stroke: the canvas claims every touch on it, and the canvas area claims two-finger gestures
