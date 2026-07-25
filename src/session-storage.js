@@ -396,7 +396,11 @@ function list_sessions(kind) {
 		return failure("io", error);
 	}
 	const records = [...found.values()].map(({ record }) => record);
-	records.sort((a, b) => b.saved_at - a.saved_at);
+	// Records written before there was a saved_at field all report 0, so ties are common on a
+	// storage area that predates it. Break them on ID rather than leaving the order up to whatever
+	// sequence localStorage happened to enumerate its keys in — callers that pick "the first one"
+	// (sessions.js resumes the newest autosave) should at least pick the same one every time.
+	records.sort((a, b) => (b.saved_at - a.saved_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 	return { ok: true, records };
 }
 

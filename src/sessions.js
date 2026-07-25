@@ -8,7 +8,7 @@ import { change_url_param, get_uris, load_image_from_uri, open_from_image_info, 
 import { $G, debounce, get_help_folder_icon, image_data_match, is_discord_embed, make_canvas, to_canvas_coords } from "./helpers.js";
 import { storage_quota_exceeded } from "./manage-storage.js";
 import { showMessageBox } from "./msgbox.js";
-import { AUTOSAVE, describe_storage_failure, is_storage_available, read_session, session_key, STORAGE_DISABLED_MESSAGE, write_session } from "./session-storage.js";
+import { AUTOSAVE, describe_storage_failure, is_storage_available, list_sessions, read_session, session_key, STORAGE_DISABLED_MESSAGE, write_session } from "./session-storage.js";
 
 const log = (...args) => {
 	window.console?.log(...args);
@@ -929,6 +929,65 @@ const end_current_session = () => {
 	}
 };
 const generate_session_id = () => (Math.random() * (2 ** 32)).toString(16).replace(".", "");
+/** The "alphanumeric-esque" characters a session ID is allowed to be made of. */
+const session_id_characters = /[-0-9A-Za-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02af\u1d00-\u1d25\u1d62-\u1d65\u1d6b-\u1d77\u1d79-\u1d9a\u1e00-\u1eff\u2090-\u2094\u2184-\u2184\u2488-\u2490\u271d-\u271d\u2c60-\u2c7c\u2c7e-\u2c7f\ua722-\ua76f\ua771-\ua787\ua78b-\ua78c\ua7fb-\ua7ff\ufb00-\ufb06]+/;
+
+/**
+ * Whether a session ID found in storage can be put in the URL and read back as the same ID.
+ *
+ * The IDs in storage aren't all ours to trust. The autosave keys go back to a format that was
+ * just a prefix plus whatever was in the hash, and localStorage is shared with everything else
+ * that has ever run on this origin. An ID that doesn't survive the round trip through the hash
+ * would quietly start a *different* session than the one being restored — a blank canvas, plus a
+ * second autosave record under the mangled ID — and an ID that fails the validation in
+ * update_session_from_location_hash would leave the tab with no session at all, which means no
+ * autosave, silently, for the rest of the visit. A generated ID always passes, so the worst that
+ * being strict here can cost is starting fresh.
+ * @param {string} session_id
+ * @returns {boolean}
+ */
+const is_resumable_session_id = (session_id) =>
+	session_id !== "" &&
+	encodeURIComponent(session_id) === session_id &&
+	session_id_characters.test(session_id);
+
+/**
+ * Which session to open when the URL doesn't name one: the most recently autosaved document, so
+ * that closing the tab and coming back isn't the same as throwing the drawing away.
+ *
+ * Resuming means adopting the old session's *ID*, not copying its image into a new session. The
+ * URL stays the one source of truth for which document is open, and autosave keeps writing to the
+ * record the image came from, so restoring can't fork a second copy of the same drawing.
+ *
+ * File > New needs no special case: it starts a session with a fresh ID and autosaves the blank
+ * canvas under it, which makes that blank session the most recent one.
+ *
+ * Known consequence: two tabs opened without a hash now resume the *same* session and autosave
+ * over each other. That collision has always been reachable (paste a #local: URL into a second
+ * tab) and the app has never guarded against it; resuming just makes it easier to hit by accident.
+ * Fixing it properly means a claim marker with a heartbeat, so a crashed tab doesn't hold a session
+ * hostage — a change to how LocalSession starts, not to which session we pick, and better made on
+ * its own.
+ *
+ * Cost note: this parses every autosave record, each of which holds a full PNG data URL. That's
+ * bounded by the storage quota (a few megabytes) and happens once, on a load that has no document
+ * to show yet. If it ever shows up in the first-load budget (see first-load-tests.spec.js), the
+ * fix is a small "last active session" pointer key, not a cache.
+ * @returns {string} an existing session ID to resume, or a fresh one if there's nothing to resume
+ */
+const session_id_to_resume = () => {
+	const listing = list_sessions(AUTOSAVE);
+	if (!listing.ok) {
+		// Storage is off or unreadable. Nothing to resume, and nothing to say about it here:
+		// LocalSession reports the storage problem itself, once the session starts.
+		return generate_session_id();
+	}
+	// Newest first, skipping any record whose ID we can't safely put in the URL, so one bad
+	// entry hides at most itself.
+	const resumable = listing.records.find((record) => is_resumable_session_id(record.id));
+	return resumable ? resumable.id : generate_session_id();
+};
+
 const update_session_from_location_hash = () => {
 	const session_match = location.hash.match(/^#?(?:.*,)?(session|local):(.*)$/i);
 	const load_from_url_match = location.hash.match(/^#?(?:.*,)?(load):(.*)$/i);
@@ -941,7 +1000,7 @@ const update_session_from_location_hash = () => {
 		} else if (!local && session_id.match(/[./[\]#$]/)) {
 			log("Session ID is not a valid Firebase location; it cannot contain any of ./[]#$");
 			end_current_session();
-		} else if (!session_id.match(/[-0-9A-Za-z\u00c0-\u00d6\u00d8-\u00f6\u00f8-\u02af\u1d00-\u1d25\u1d62-\u1d65\u1d6b-\u1d77\u1d79-\u1d9a\u1e00-\u1eff\u2090-\u2094\u2184-\u2184\u2488-\u2490\u271d-\u271d\u2c60-\u2c7c\u2c7e-\u2c7f\ua722-\ua76f\ua771-\ua787\ua78b-\ua78c\ua7fb-\ua7ff\ufb00-\ufb06]+/)) {
+		} else if (!session_id_characters.test(session_id)) {
 			log("Invalid session ID; it must consist of 'alphanumeric-esque' characters");
 			end_current_session();
 		} else if (
@@ -996,7 +1055,11 @@ const update_session_from_location_hash = () => {
 		log("No session ID in hash");
 		const old_hash = location.hash;
 		end_current_session();
-		change_url_param("local", generate_session_id(), { replace_history_state: true });
+		// Only a genuinely empty hash means "no document asked for". Anything else that lands here
+		// is a hash we couldn't make sense of — a malformed #load:, someone else's fragment — and
+		// resuming a drawing in response to that would be answering a question nobody asked.
+		const session_id = old_hash === "" ? session_id_to_resume() : generate_session_id();
+		change_url_param("local", session_id, { replace_history_state: true });
 		log("After replaceState:", location.hash);
 		if (old_hash === location.hash) {
 			// e.g. on Wayback Machine
